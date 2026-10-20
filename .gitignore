@@ -1,0 +1,26 @@
+# Python bytecode & cache
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Virtual Environments
+.venv/
+venv/
+ENV/
+
+# Local databases & logs
+*.db
+*.sqlite3
+*.log
+
+# Generated reports & captured PCAPs
+captures/*.pcap
+captures/*.pcapng
+!captures/.gitkeep
+generated_reports/*.pdf
+!generated_reports/.gitkeep
+
+# Operating system artifacts
+.DS_Store
+Thumbs.db

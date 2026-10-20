@@ -1,0 +1,128 @@
+/* ==========================================================================
+   Electrical Interference Investigation Tool - Modern Network Engineering CSS
+   ========================================================================== */
+
+:root {
+    --bg-darker: #0c1017;
+    --bg-card: #151b23;
+    --border-color: #30363d;
+    --navy-header: #101622;
+    --accent-cyan: #0dcaf0;
+    --accent-green: #2ea043;
+    --accent-yellow: #d29922;
+    --accent-red: #f85149;
+    --text-muted: #8b949e;
+}
+
+body {
+    background-color: var(--bg-darker);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    color: #e6edf3;
+    overflow-x: hidden;
+}
+
+/* Typography & Utility classes */
+.fs-7 { font-size: 0.9rem !important; }
+.fs-8 { font-size: 0.82rem !important; }
+.fs-9 { font-size: 0.74rem !important; }
+
+.bg-darker { background-color: var(--bg-darker) !important; }
+.bg-card { background-color: var(--bg-card) !important; }
+.bg-navy { background-color: var(--navy-header) !important; }
+
+/* Status Dot Indicator */
+.status-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    display: inline-block;
+    transition: all 0.3s ease;
+}
+
+.status-normal {
+    background-color: var(--accent-green);
+    box-shadow: 0 0 8px rgba(46, 160, 67, 0.6);
+}
+
+.status-warning {
+    background-color: var(--accent-yellow);
+    box-shadow: 0 0 8px rgba(210, 153, 34, 0.6);
+}
+
+.status-critical {
+    background-color: var(--accent-red);
+    box-shadow: 0 0 8px rgba(248, 81, 73, 0.8);
+    animation: critical-pulse 1.2s infinite;
+}
+
+.status-idle {
+    background-color: #6c757d;
+}
+
+@keyframes critical-pulse {
+    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(248, 81, 73, 0.7); }
+    70% { transform: scale(1.1); box-shadow: 0 0 0 8px rgba(248, 81, 73, 0); }
+    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(248, 81, 73, 0); }
+}
+
+.pulse-animation {
+    animation: badge-pulse 2s infinite;
+}
+
+@keyframes badge-pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.55; }
+    100% { opacity: 1; }
+}
+
+/* KPI Cards */
+.kpi-card {
+    transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.kpi-card:hover {
+    transform: translateY(-2px);
+    border-color: #484f58 !important;
+}
+
+/* Custom Table Polish */
+.table-dark {
+    --bs-table-bg: var(--bg-card);
+    --bs-table-border-color: var(--border-color);
+}
+
+.table-secondary {
+    --bs-table-bg: #1c2128;
+    color: #c9d1d9;
+}
+
+/* Form inputs */
+.form-control, .form-select {
+    border-color: var(--border-color);
+    font-size: 0.85rem;
+}
+
+.form-control:focus, .form-select:focus {
+    background-color: #10141a;
+    border-color: var(--accent-cyan);
+    color: #ffffff;
+    box-shadow: 0 0 0 0.2rem rgba(13, 202, 240, 0.2);
+}
+
+/* Topology Diagram Styling */
+.topology-container {
+    background: #0f141c;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 15px;
+}
+
+.cable-line {
+    animation: dash 30s linear infinite;
+}
+
+@keyframes dash {
+    to {
+        stroke-dashoffset: -1000;
+    }
+}

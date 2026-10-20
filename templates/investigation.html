@@ -1,0 +1,280 @@
+{% extends "base.html" %}
+
+{% block title %}EMI Investigation - Electrical Interference Investigation Tool{% endblock %}
+
+{% block content %}
+<div class="row g-4 mb-4">
+    <div class="col-12">
+        <div class="card bg-card border-secondary shadow-sm">
+            <div class="card-body p-4">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+                    <div>
+                        <h2 class="h3 fw-bold text-light mb-1">
+                            <i class="bi bi-lightning-charge text-warning me-2"></i>Electrical Interference (EMI) Investigation Module
+                        </h2>
+                        <p class="text-secondary mb-0">
+                            Perform structured scientific comparisons across 4 controlled test periods to evaluate whether
+                            performance degradation correlates with active electromagnetic interference or physical cable faults.
+                        </p>
+                    </div>
+                    <div>
+                        <button class="btn btn-outline-info btn-sm" id="btn-prefill-example">
+                            <i class="bi bi-pencil-square me-1"></i> Pre-Fill Industrial Example
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Electrical Safety Banner -->
+<div class="alert alert-danger bg-danger-subtle border-danger text-danger-emphasis mb-4 shadow-sm" role="alert">
+    <div class="d-flex align-items-center">
+        <i class="bi bi-shield-slash-fill fs-2 me-3"></i>
+        <div>
+            <h5 class="fw-bold mb-1">Strict Electrical Safety Requirements</h5>
+            <p class="fs-8 mb-0">
+                Do NOT open high-voltage electrical cabinets, touch live conductors, or conduct hazardous electrical experiments.
+                Network investigations must be limited to safe physical routing adjustments, distance separation,
+                and cable shielding swaps under standard occupational safety protocols.
+            </p>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Left Column: Incident & Environmental Observation Logger -->
+    <div class="col-lg-5">
+        <div class="card bg-card border-secondary shadow-sm h-100">
+            <div class="card-header bg-darker border-secondary">
+                <h5 class="h6 mb-0 text-light fw-bold">
+                    <i class="bi bi-journal-text text-info me-2"></i>Log Incident & Environmental Variables
+                </h5>
+            </div>
+            <div class="card-body p-3">
+                <form id="incident-form">
+                    <div class="mb-3">
+                        <label class="form-label text-secondary fs-8 mb-1">Incident Title / Identifier</label>
+                        <input type="text" id="inc-title" class="form-control form-control-sm bg-dark text-light border-secondary" placeholder="e.g. Production Floor CNC VFD Latency Burst" required>
+                    </div>
+
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label text-secondary fs-8 mb-1">Physical Location</label>
+                            <input type="text" id="inc-location" class="form-control form-control-sm bg-dark text-light border-secondary" placeholder="Building 3, Tray 14" value="Factory Floor B">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-secondary fs-8 mb-1">Associated Session</label>
+                            <select id="inc-session-id" class="form-select form-select-sm bg-dark text-light border-secondary">
+                                {% for s in sessions %}
+                                <option value="{{ s.id }}">Session #{{ s.id }} - {{ s.name[:25] }}</option>
+                                {% else %}
+                                <option value="">No sessions available</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label text-secondary fs-8 mb-1">Cable Type</label>
+                            <select id="inc-cable-type" class="form-select form-select-sm bg-dark text-light border-secondary">
+                                <option value="Cat5e UTP (Unshielded)">Cat5e UTP (Unshielded)</option>
+                                <option value="Cat6 UTP (Unshielded)" selected>Cat6 UTP (Unshielded)</option>
+                                <option value="Cat6a F/UTP (Foil Shield)">Cat6a F/UTP (Foil Shield)</option>
+                                <option value="Cat6a S/FTP (Braided Shield)">Cat6a S/FTP (Braided Shield)</option>
+                                <option value="Cat7 / Cat8 STP">Cat7 / Cat8 STP</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label text-secondary fs-8 mb-1">Length (m)</label>
+                            <input type="number" id="inc-cable-length" class="form-control form-control-sm bg-dark text-light border-secondary" value="25.0" step="0.5">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label text-secondary fs-8 mb-1">Distance (m)</label>
+                            <input type="number" id="inc-distance" class="form-control form-control-sm bg-dark text-light border-secondary" value="0.15" step="0.05" title="Distance from suspected electrical source">
+                        </div>
+                    </div>
+
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label text-secondary fs-8 mb-1">Suspected Electrical Source</label>
+                            <select id="inc-source-type" class="form-select form-select-sm bg-dark text-light border-secondary">
+                                <option value="vfd" selected>Variable Frequency Drive (VFD)</option>
+                                <option value="motor">Induction Motor / Heavy Machinery</option>
+                                <option value="elevator">Elevator Motor / Hoist</option>
+                                <option value="transformer">Step-down Power Transformer</option>
+                                <option value="welder">Arc Welding Equipment</option>
+                                <option value="hvac">Industrial HVAC Compressor</option>
+                                <option value="ballast">Fluorescent Lighting Ballast</option>
+                                <option value="other">Other High-Voltage Apparatus</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 d-flex align-items-center pt-3">
+                            <div class="form-check form-switch fs-8">
+                                <input class="form-check-input" type="checkbox" id="inc-operating" checked>
+                                <label class="form-check-label text-light fw-medium" for="inc-operating">
+                                    Equipment Active During Test
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label text-secondary fs-8 mb-1">Observed Interface CRC/FCS Counters (If Any)</label>
+                        <input type="number" id="inc-crc" class="form-control form-control-sm bg-dark text-light border-secondary" value="0" min="0">
+                        <small class="text-muted fs-9">From managed switch SNMP port or compatible enterprise NIC driver.</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label text-secondary fs-8 mb-1">Investigator Observations</label>
+                        <textarea id="inc-notes" rows="3" class="form-control form-control-sm bg-dark text-light border-secondary" placeholder="Document noise patterns, physical conduit proximity, motor start cycles..."></textarea>
+                    </div>
+
+                    <button type="button" id="btn-save-incident" class="btn btn-primary btn-sm w-100 fw-bold">
+                        <i class="bi bi-save me-1"></i> Save Incident Record
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Column: Comparative Tests Matrix (Test A, B, C, D) & Correlation Engine -->
+    <div class="col-lg-7">
+        <div class="card bg-card border-secondary shadow-sm mb-4">
+            <div class="card-header bg-darker border-secondary d-flex justify-content-between align-items-center">
+                <h5 class="h6 mb-0 text-light fw-bold">
+                    <i class="bi bi-grid-3x3-gap text-warning me-2"></i>Comparative Testing Protocol (Tests A - D)
+                </h5>
+                <span class="fs-9 text-muted">ANSI/TIA-568.0-D Verification</span>
+            </div>
+            <div class="card-body p-3">
+                <p class="fs-8 text-secondary mb-3">
+                    Compare performance across 4 controlled states to confirm or eliminate physical electromagnetic interference:
+                </p>
+
+                <div class="table-responsive">
+                    <table class="table table-dark table-bordered table-sm fs-8 align-middle" id="comp-test-table">
+                        <thead class="table-secondary fs-9 text-uppercase">
+                            <tr>
+                                <th style="width: 12%;">Test Code</th>
+                                <th style="width: 38%;">Condition</th>
+                                <th style="width: 16%;">Avg RTT</th>
+                                <th style="width: 16%;">Loss %</th>
+                                <th style="width: 18%;">CRC Errors</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Test A -->
+                            <tr>
+                                <td class="text-center"><span class="badge bg-secondary">Test A</span></td>
+                                <td>
+                                    <strong>Normal Baseline</strong>
+                                    <div class="text-muted fs-9">Electrical machinery powered OFF</div>
+                                </td>
+                                <td><input type="number" id="test-a-rtt" class="form-control form-control-sm bg-dark text-light border-secondary py-0" value="1.2" step="0.1"></td>
+                                <td><input type="number" id="test-a-loss" class="form-control form-control-sm bg-dark text-light border-secondary py-0" value="0.0" step="0.1"></td>
+                                <td><input type="number" id="test-a-crc" class="form-control form-control-sm bg-dark text-light border-secondary py-0" value="0"></td>
+                            </tr>
+                            <!-- Test B -->
+                            <tr>
+                                <td class="text-center"><span class="badge bg-danger">Test B</span></td>
+                                <td>
+                                    <strong>Suspected Source Active</strong>
+                                    <div class="text-muted fs-9">Machinery operational in normal mode</div>
+                                </td>
+                                <td><input type="number" id="test-b-rtt" class="form-control form-control-sm bg-dark text-light border-secondary py-0" value="38.5" step="0.1"></td>
+                                <td><input type="number" id="test-b-loss" class="form-control form-control-sm bg-dark text-light border-secondary py-0" value="8.5" step="0.1"></td>
+                                <td><input type="number" id="test-b-crc" class="form-control form-control-sm bg-dark text-light border-secondary py-0" value="18"></td>
+                            </tr>
+                            <!-- Test C -->
+                            <tr>
+                                <td class="text-center"><span class="badge bg-info text-dark">Test C</span></td>
+                                <td>
+                                    <strong>Cable Rerouted</strong>
+                                    <div class="text-muted fs-9">Cable moved &ge; 40 cm away from source</div>
+                                </td>
+                                <td><input type="number" id="test-c-rtt" class="form-control form-control-sm bg-dark text-light border-secondary py-0" value="1.3" step="0.1"></td>
+                                <td><input type="number" id="test-c-loss" class="form-control form-control-sm bg-dark text-light border-secondary py-0" value="0.0" step="0.1"></td>
+                                <td><input type="number" id="test-c-crc" class="form-control form-control-sm bg-dark text-light border-secondary py-0" value="0"></td>
+                            </tr>
+                            <!-- Test D -->
+                            <tr>
+                                <td class="text-center"><span class="badge bg-success">Test D</span></td>
+                                <td>
+                                    <strong>Shielded Cable Swap</strong>
+                                    <div class="text-muted fs-9">Cat6a STP cable installed & grounded</div>
+                                </td>
+                                <td><input type="number" id="test-d-rtt" class="form-control form-control-sm bg-dark text-light border-secondary py-0" value="1.1" step="0.1"></td>
+                                <td><input type="number" id="test-d-loss" class="form-control form-control-sm bg-dark text-light border-secondary py-0" value="0.0" step="0.1"></td>
+                                <td><input type="number" id="test-d-crc" class="form-control form-control-sm bg-dark text-light border-secondary py-0" value="0"></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="d-flex justify-content-end gap-2 mt-2">
+                    <button type="button" id="btn-run-correlation" class="btn btn-warning text-dark btn-sm fw-bold px-4">
+                        <i class="bi bi-cpu me-1"></i> Run Scientific Correlation Engine
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Diagnostic Correlation Results Box -->
+        <div class="card bg-card border-secondary shadow-sm" id="correlation-results-card">
+            <div class="card-header bg-darker border-secondary d-flex justify-content-between align-items-center">
+                <h5 class="h6 mb-0 text-light fw-bold">
+                    <i class="bi bi-clipboard2-pulse text-success me-2"></i>Investigation Correlation Findings & Diagnosis
+                </h5>
+                <span class="badge bg-secondary" id="confidence-meter-badge">Confidence: --%</span>
+            </div>
+            <div class="card-body p-3">
+                <div id="correlation-placeholder" class="text-center text-muted py-4">
+                    <i class="bi bi-cpu fs-1 d-block mb-2 text-secondary"></i>
+                    Click <strong>"Run Scientific Correlation Engine"</strong> to evaluate the evidence matrix.
+                </div>
+
+                <div id="correlation-output" class="d-none">
+                    <div class="d-flex align-items-center justify-content-between mb-3 p-3 rounded bg-darker border border-secondary">
+                        <div>
+                            <span class="fs-9 text-uppercase text-secondary fw-bold">Diagnostic Conclusion</span>
+                            <h5 class="fw-bold mb-0 text-light" id="diag-category-title">--</h5>
+                        </div>
+                        <div class="text-end">
+                            <span class="fs-9 text-uppercase text-secondary fw-bold">Evidence Quality</span>
+                            <div class="progress mt-1" style="width: 140px; height: 12px;">
+                                <div id="diag-confidence-bar" class="progress-bar bg-success" role="progressbar" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <h6 class="fw-bold text-light fs-8 mb-2">Correlated Evidence Points:</h6>
+                        <ul class="fs-8 text-light-50 ps-3 mb-0" id="diag-findings-list">
+                            <!-- Populated by JS -->
+                        </ul>
+                    </div>
+
+                    <div class="mb-3">
+                        <h6 class="fw-bold text-info fs-8 mb-2">Recommended Technical Actions:</h6>
+                        <ul class="fs-8 text-light-50 ps-3 mb-0" id="diag-recommendations-list">
+                            <!-- Populated by JS -->
+                        </ul>
+                    </div>
+
+                    <div class="alert alert-dark border-secondary p-2 mb-0 fs-9 text-muted" id="diag-disclaimer-box">
+                        <i class="bi bi-info-circle me-1 text-warning"></i>
+                        <span id="diag-disclaimer-text"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ url_for('static', filename='js/investigation.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,331 @@
+{% extends "base.html" %}
+
+{% block title %}Live Dashboard - Electrical Interference Investigation Tool{% endblock %}
+
+{% block content %}
+<!-- Monitoring Control & Configuration Bar -->
+<div class="row g-3 mb-4">
+    <div class="col-12">
+        <div class="card bg-card border-secondary shadow-sm">
+            <div class="card-body p-3">
+                <form id="monitoring-form" class="row g-2 align-items-center">
+                    <div class="col-md-3">
+                        <label class="form-label text-secondary fs-8 mb-1 fw-semibold">Target IP / Hostname</label>
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text bg-darker border-secondary text-info"><i class="bi bi-crosshair"></i></span>
+                            <input type="text" id="target-ip" class="form-control bg-dark text-light border-secondary" placeholder="e.g. 192.168.10.1" value="192.168.10.1" required>
+                        </div>
+                    </div>
+
+                    <div class="col-md-2">
+                        <label class="form-label text-secondary fs-8 mb-1 fw-semibold">Physical Interface</label>
+                        <select id="interface-select" class="form-select form-select-sm bg-dark text-light border-secondary">
+                            {% for iface in interfaces %}
+                            <option value="{{ iface.name }}" {% if iface.is_up and iface.is_physical %}selected{% endif %}>
+                                {{ iface.name }} ({{ iface.speed_mbps }} Mbps)
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="col-md-2">
+                        <label class="form-label text-secondary fs-8 mb-1 fw-semibold">Interval / Timeout</label>
+                        <div class="d-flex gap-1">
+                            <select id="interval-sec" class="form-select form-select-sm bg-dark text-light border-secondary" title="Interval between pings">
+                                <option value="0.5">0.5 sec</option>
+                                <option value="1.0" selected>1.0 sec</option>
+                                <option value="2.0">2.0 sec</option>
+                            </select>
+                            <select id="timeout-sec" class="form-select form-select-sm bg-dark text-light border-secondary" title="Timeout">
+                                <option value="1.0">1.0s</option>
+                                <option value="2.0" selected>2.0s</option>
+                                <option value="3.0">3.0s</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="col-md-2">
+                        <label class="form-label text-secondary fs-8 mb-1 fw-semibold">Duration Preset</label>
+                        <select id="duration-select" class="form-select form-select-sm bg-dark text-light border-secondary">
+                            <option value="60">1 Minute (Quick)</option>
+                            <option value="300" selected>5 Minutes (Standard)</option>
+                            <option value="900">15 Minutes (Extended)</option>
+                            <option value="3600">1 Hour (Stress)</option>
+                            <option value="39600">11 Hours (Overnight)</option>
+                            <option value="continuous">Continuous (Manual Stop)</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-3 d-flex align-items-end gap-2 pt-3 pt-md-0">
+                        <button type="button" id="btn-start-monitor" class="btn btn-success btn-sm flex-grow-1 fw-bold">
+                            <i class="bi bi-play-fill me-1"></i> Start Monitoring
+                        </button>
+                        <button type="button" id="btn-stop-monitor" class="btn btn-danger btn-sm flex-grow-1 fw-bold" disabled>
+                            <i class="bi bi-stop-fill me-1"></i> Stop
+                        </button>
+                    </div>
+                </form>
+
+                <!-- Multi-target Collapsible Details -->
+                <div class="mt-2 pt-2 border-top border-secondary-subtle">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="form-check form-switch fs-8">
+                            <input class="form-check-input" type="checkbox" id="chk-multi-target">
+                            <label class="form-check-label text-light fw-medium" for="chk-multi-target">
+                                Enable Multi-Target Hop Isolation (Gateway, Local Peer, DNS, Internet)
+                            </label>
+                        </div>
+                        <span class="fs-8 text-secondary">
+                            <i class="bi bi-shield-lock me-1"></i>Safe Subprocess Execution | Zero Shell Injection
+                        </span>
+                    </div>
+
+                    <div id="multi-target-config" class="row g-2 mt-1 d-none">
+                        <div class="col-md-3">
+                            <label class="fs-9 text-muted mb-0">Default Gateway (Hop 1)</label>
+                            <input type="text" id="target-gateway" class="form-control form-control-sm bg-darker text-light border-secondary" placeholder="192.168.10.1" value="192.168.10.1">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="fs-9 text-muted mb-0">Local Switch Peer</label>
+                            <input type="text" id="target-peer" class="form-control form-control-sm bg-darker text-light border-secondary" placeholder="192.168.10.20" value="192.168.10.20">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="fs-9 text-muted mb-0">DNS Server (Hop 2)</label>
+                            <input type="text" id="target-dns" class="form-control form-control-sm bg-darker text-light border-secondary" placeholder="8.8.8.8" value="8.8.8.8">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="fs-9 text-muted mb-0">Remote WAN Target</label>
+                            <input type="text" id="target-remote" class="form-control form-control-sm bg-darker text-light border-secondary" placeholder="1.1.1.1" value="1.1.1.1">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Primary Real-Time KPI Cards -->
+<div class="row g-3 mb-4">
+    <!-- Network Status -->
+    <div class="col-xl-2 col-md-4 col-sm-6">
+        <div class="card bg-card border-secondary h-100 kpi-card" id="card-status">
+            <div class="card-body p-3">
+                <span class="text-secondary fs-8 text-uppercase fw-semibold">Link Status</span>
+                <div class="d-flex align-items-center mt-2">
+                    <span id="kpi-status-indicator" class="status-dot status-idle me-2"></span>
+                    <h4 class="h5 fw-bold mb-0 text-light" id="kpi-status-text">Idle</h4>
+                </div>
+                <small class="text-muted fs-9 mt-1 d-block" id="kpi-duration-text">Duration: 00:00:00</small>
+            </div>
+        </div>
+    </div>
+
+    <!-- Average Latency RTT -->
+    <div class="col-xl-2 col-md-4 col-sm-6">
+        <div class="card bg-card border-secondary h-100 kpi-card">
+            <div class="card-body p-3">
+                <span class="text-secondary fs-8 text-uppercase fw-semibold">Avg Ping Latency</span>
+                <div class="mt-2">
+                    <h3 class="h4 fw-bold mb-0 text-info"><span id="kpi-avg-rtt">0.00</span> <span class="fs-7 text-secondary">ms</span></h3>
+                </div>
+                <small class="text-muted fs-9 mt-1 d-block">
+                    Min: <span id="kpi-min-rtt">0.0</span> | Max: <span id="kpi-max-rtt">0.0</span> ms
+                </small>
+            </div>
+        </div>
+    </div>
+
+    <!-- Packet Loss -->
+    <div class="col-xl-2 col-md-4 col-sm-6">
+        <div class="card bg-card border-secondary h-100 kpi-card">
+            <div class="card-body p-3">
+                <span class="text-secondary fs-8 text-uppercase fw-semibold">Packet Loss</span>
+                <div class="mt-2">
+                    <h3 class="h4 fw-bold mb-0" id="kpi-loss-text">0.00%</h3>
+                </div>
+                <small class="text-muted fs-9 mt-1 d-block">
+                    Lost: <span id="kpi-lost-packets">0</span> / Sent: <span id="kpi-sent-packets">0</span>
+                </small>
+            </div>
+        </div>
+    </div>
+
+    <!-- Interface Error Counters -->
+    <div class="col-xl-2 col-md-4 col-sm-6">
+        <div class="card bg-card border-secondary h-100 kpi-card">
+            <div class="card-body p-3">
+                <span class="text-secondary fs-8 text-uppercase fw-semibold">Interface Errors</span>
+                <div class="mt-2">
+                    <h3 class="h4 fw-bold mb-0 text-warning" id="kpi-rx-errors">0</h3>
+                </div>
+                <small class="text-muted fs-9 mt-1 d-block">
+                    Rx Errs: <span id="kpi-rx-err-val">0</span> | Tx Errs: <span id="kpi-tx-err-val">0</span>
+                </small>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hardware CRC / FCS Frame Errors -->
+    <div class="col-xl-2 col-md-4 col-sm-6">
+        <div class="card bg-card border-secondary h-100 kpi-card">
+            <div class="card-body p-3">
+                <span class="text-secondary fs-8 text-uppercase fw-semibold">CRC/FCS Errors</span>
+                <div class="mt-2">
+                    <h3 class="h4 fw-bold mb-0 text-danger" id="kpi-crc-errors">0</h3>
+                </div>
+                <small class="text-muted fs-9 mt-1 d-block" title="Hardware frame check sequence corruption delta">
+                    Delta: <span id="kpi-crc-delta">0</span> (Physical Frame)
+                </small>
+            </div>
+        </div>
+    </div>
+
+    <!-- Discards & Drops -->
+    <div class="col-xl-2 col-md-4 col-sm-6">
+        <div class="card bg-card border-secondary h-100 kpi-card">
+            <div class="card-body p-3">
+                <span class="text-secondary fs-8 text-uppercase fw-semibold">Interface Drops</span>
+                <div class="mt-2">
+                    <h3 class="h4 fw-bold mb-0 text-light" id="kpi-dropped-packets">0</h3>
+                </div>
+                <small class="text-muted fs-9 mt-1 d-block">
+                    Speed: <span id="kpi-speed-mbps">--</span> Mbps
+                </small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Real-Time Graphs (Latency, Loss, Interface Errors) -->
+<div class="row g-4 mb-4">
+    <!-- Latency Timeline Graph -->
+    <div class="col-lg-8">
+        <div class="card bg-card border-secondary shadow-sm h-100">
+            <div class="card-header bg-darker border-secondary d-flex justify-content-between align-items-center py-2">
+                <span class="fw-bold text-light fs-7">
+                    <i class="bi bi-graph-up text-info me-2"></i>Real-Time Round-Trip Time (RTT) & Jitter Timeline
+                </span>
+                <span class="badge bg-dark border border-secondary text-secondary fs-9" id="chart-point-count">0 points</span>
+            </div>
+            <div class="card-body p-3">
+                <div style="height: 280px; position: relative;">
+                    <canvas id="latencyChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Packet Loss & Error Deltas Graph -->
+    <div class="col-lg-4">
+        <div class="card bg-card border-secondary shadow-sm h-100">
+            <div class="card-header bg-darker border-secondary d-flex justify-content-between align-items-center py-2">
+                <span class="fw-bold text-light fs-7">
+                    <i class="bi bi-bar-chart-fill text-warning me-2"></i>Loss % & Physical CRC Deltas
+                </span>
+                <span class="badge bg-dark border border-secondary text-secondary fs-9">Live Delta</span>
+            </div>
+            <div class="card-body p-3">
+                <div style="height: 280px; position: relative;">
+                    <canvas id="lossErrorChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Multi-Target Latency Matrix (When Multi-Target Mode Active) -->
+<div class="row g-4 mb-4" id="multi-target-table-row">
+    <div class="col-12">
+        <div class="card bg-card border-secondary shadow-sm">
+            <div class="card-header bg-darker border-secondary py-2 d-flex justify-content-between align-items-center">
+                <span class="fw-bold text-light fs-7">
+                    <i class="bi bi-segmented-nav text-success me-2"></i>Multi-Target Hop-by-Hop Telemetry Matrix
+                </span>
+                <span class="fs-9 text-muted">Differentiates Local Cable Faults from Upstream Network Anomalies</span>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-dark table-hover mb-0 fs-8 align-middle" id="multi-target-table">
+                        <thead class="table-secondary fs-9 text-uppercase">
+                            <tr>
+                                <th>Role / Segment</th>
+                                <th>Target IP</th>
+                                <th>Packets Sent / Recv</th>
+                                <th>Loss %</th>
+                                <th>Current RTT</th>
+                                <th>Avg RTT</th>
+                                <th>Min / Max RTT</th>
+                                <th>Segment Health</th>
+                            </tr>
+                        </thead>
+                        <tbody id="multi-target-tbody">
+                            <tr>
+                                <td colspan="8" class="text-center text-muted py-3">
+                                    Start monitoring to observe real-time telemetry across network segments.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Optional TShark Packet Capture Drawer -->
+<div class="row g-4">
+    <div class="col-12">
+        <div class="card bg-card border-secondary shadow-sm">
+            <div class="card-header bg-darker border-secondary py-2 d-flex justify-content-between align-items-center">
+                <span class="fw-bold text-light fs-7">
+                    <i class="bi bi-filetype-raw text-danger me-2"></i>Wireshark / TShark Packet Dissection (Optional Deep Capture)
+                </span>
+                <span class="badge bg-secondary fs-9">PCAPNG Format</span>
+            </div>
+            <div class="card-body p-3">
+                <div class="row g-3 align-items-center">
+                    <div class="col-md-4">
+                        <label class="form-label text-secondary fs-8 mb-1">Capture Interface</label>
+                        <select id="pcap-interface" class="form-select form-select-sm bg-dark text-light border-secondary">
+                            {% for iface in interfaces %}
+                            <option value="{{ iface.name }}">{{ iface.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label text-secondary fs-8 mb-1">Duration (Sec)</label>
+                        <input type="number" id="pcap-duration" class="form-control form-control-sm bg-dark text-light border-secondary" value="60" min="5" max="600">
+                    </div>
+                    <div class="col-md-3 d-flex align-items-end gap-2 pt-3 pt-md-0">
+                        <button type="button" id="btn-start-pcap" class="btn btn-outline-info btn-sm flex-grow-1 fw-bold">
+                            <i class="bi bi-record-circle me-1"></i> Start Capture
+                        </button>
+                        <button type="button" id="btn-stop-pcap" class="btn btn-outline-danger btn-sm flex-grow-1 fw-bold" disabled>
+                            <i class="bi bi-stop-circle me-1"></i> Stop Capture
+                        </button>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="alert alert-dark border-secondary p-2 mb-0 fs-9 text-muted">
+                            <i class="bi bi-info-circle me-1 text-info"></i>
+                            Captures are saved to <code>captures/</code>. Does not record invalid FCS frames due to NIC hardware discarding.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Capture Results Card -->
+                <div id="pcap-results-box" class="mt-3 p-3 bg-darker rounded border border-secondary d-none">
+                    <h6 class="fw-bold text-info fs-8 mb-2">Capture Dissection Summary:</h6>
+                    <div class="row g-2 fs-8 text-light" id="pcap-summary-content">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+{% endblock %}

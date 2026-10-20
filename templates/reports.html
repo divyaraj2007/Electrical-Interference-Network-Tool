@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+
+{% block title %}Reports & Export - Electrical Interference Investigation Tool{% endblock %}
+
+{% block content %}
+<div class="row g-4 mb-4">
+    <div class="col-12">
+        <div class="card bg-card border-secondary shadow-sm">
+            <div class="card-body p-4">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+                    <div>
+                        <h2 class="h3 fw-bold text-light mb-1">
+                            <i class="bi bi-file-earmark-bar-graph text-info me-2"></i>Investigation Reports & Telemetry Export
+                        </h2>
+                        <p class="text-secondary mb-0">
+                            Download publication-grade PDF engineering reports and export raw timestamped CSV datasets for external analysis.
+                        </p>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-outline-info btn-sm" id="btn-seed-benchmark">
+                            <i class="bi bi-database-add me-1"></i> Seed Benchmark Dataset
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Sessions Table -->
+<div class="row g-4 mb-4">
+    <div class="col-12">
+        <div class="card bg-card border-secondary shadow-sm">
+            <div class="card-header bg-darker border-secondary d-flex justify-content-between align-items-center">
+                <h5 class="h6 mb-0 text-light fw-bold">
+                    <i class="bi bi-collection text-warning me-2"></i>Investigation Sessions & Telemetry Archives
+                </h5>
+                <span class="badge bg-secondary">{{ sessions|length }} Sessions Available</span>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-dark table-hover mb-0 fs-8 align-middle">
+                        <thead class="table-secondary fs-9 text-uppercase">
+                            <tr>
+                                <th>ID</th>
+                                <th>Session Name</th>
+                                <th>Target</th>
+                                <th>Mode</th>
+                                <th>Status</th>
+                                <th>Interval / Timeout</th>
+                                <th>Created Timestamp</th>
+                                <th class="text-center">Export Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for s in sessions %}
+                            <tr>
+                                <td><span class="badge bg-secondary">#{{ s.id }}</span></td>
+                                <td>
+                                    <strong>{{ s.name }}</strong>
+                                    {% if s.is_demo %}
+                                    <span class="badge bg-info-subtle text-info fs-9 ms-1">Benchmark / Demo</span>
+                                    {% endif %}
+                                </td>
+                                <td><code>{{ s.target }}</code></td>
+                                <td>{{ s.mode|title }}</td>
+                                <td>
+                                    {% if s.status == 'running' %}
+                                    <span class="badge bg-success pulse-animation">Running</span>
+                                    {% elif s.status == 'completed' %}
+                                    <span class="badge bg-primary">Completed</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">{{ s.status|title }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ s.interval_sec }}s / {{ s.timeout_sec }}s</td>
+                                <td class="text-muted">{{ s.created_at }}</td>
+                                <td class="text-center">
+                                    <a href="/api/reports/pdf/{{ s.id }}" class="btn btn-sm btn-outline-danger py-0 px-2 fs-8 me-1" title="Download Complete PDF Report">
+                                        <i class="bi bi-file-earmark-pdf-fill me-1"></i> PDF
+                                    </a>
+                                    <a href="/api/reports/csv/{{ s.id }}" class="btn btn-sm btn-outline-success py-0 px-2 fs-8" title="Export Raw CSV Data">
+                                        <i class="bi bi-file-earmark-spreadsheet-fill me-1"></i> CSV
+                                    </a>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="8" class="text-center text-muted py-4">
+                                    No sessions logged in the database yet. Launch a monitoring session or seed a benchmark dataset.
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Logged Incidents Table -->
+<div class="row g-4 mb-4">
+    <div class="col-lg-7">
+        <div class="card bg-card border-secondary shadow-sm h-100">
+            <div class="card-header bg-darker border-secondary">
+                <h5 class="h6 mb-0 text-light fw-bold">
+                    <i class="bi bi-lightning-charge-fill text-warning me-2"></i>Physical Interference Incidents
+                </h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-dark table-hover mb-0 fs-8 align-middle">
+                        <thead class="table-secondary fs-9 text-uppercase">
+                            <tr>
+                                <th>ID</th>
+                                <th>Incident Title</th>
+                                <th>Cable Type</th>
+                                <th>Equipment Source</th>
+                                <th>CRC Delta</th>
+                                <th>Timestamp</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for inc in incidents %}
+                            <tr>
+                                <td><span class="badge bg-secondary">#{{ inc.id }}</span></td>
+                                <td><strong class="text-light">{{ inc.title }}</strong></td>
+                                <td>{{ inc.cable_type }}</td>
+                                <td>{{ inc.electrical_source_type|upper }}</td>
+                                <td><span class="badge bg-danger">{{ inc.crc_fcs_observed }}</span></td>
+                                <td class="text-muted">{{ inc.timestamp[:16] }}</td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="6" class="text-center text-muted py-3">
+                                    No physical interference incidents logged.
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Packet Captures Table -->
+    <div class="col-lg-5">
+        <div class="card bg-card border-secondary shadow-sm h-100">
+            <div class="card-header bg-darker border-secondary">
+                <h5 class="h6 mb-0 text-light fw-bold">
+                    <i class="bi bi-file-earmark-binary text-info me-2"></i>Wireshark / TShark PCAPNG Captures
+                </h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-dark table-hover mb-0 fs-8 align-middle">
+                        <thead class="table-secondary fs-9 text-uppercase">
+                            <tr>
+                                <th>Filename</th>
+                                <th>Packets</th>
+                                <th>Retransmissions</th>
+                                <th>Resets</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for cap in captures %}
+                            <tr>
+                                <td><code>{{ cap.filename }}</code></td>
+                                <td>{{ cap.packet_count }}</td>
+                                <td><span class="badge bg-warning text-dark">{{ cap.tcp_retransmissions }}</span></td>
+                                <td><span class="badge bg-secondary">{{ cap.tcp_resets }}</span></td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="4" class="text-center text-muted py-3">
+                                    No packet capture files archived yet.
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    document.getElementById('btn-seed-benchmark')?.addEventListener('click', async () => {
+        try {
+            const res = await fetch('/api/demo/seed', { method: 'POST' });
+            const data = await res.json();
+            if (data.success) {
+                alert('Benchmark demonstration dataset seeded successfully! (Session #' + data.session_id + ')');
+                window.location.reload();
+            }
+        } catch (e) {
+            alert('Failed to seed dataset: ' + e);
+        }
+    });
+</script>
+{% endblock %}

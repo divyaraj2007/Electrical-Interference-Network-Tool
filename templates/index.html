@@ -1,0 +1,213 @@
+{% extends "base.html" %}
+
+{% block title %}Overview - Electrical Interference Investigation Tool{% endblock %}
+
+{% block content %}
+<div class="row g-4 mb-4">
+    <div class="col-12">
+        <div class="card bg-card border-secondary shadow-sm">
+            <div class="card-body p-4">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+                    <div>
+                        <h2 class="h3 fw-bold text-light mb-1">
+                            <i class="bi bi-shield-check text-info me-2"></i>Electrical Interference Investigation Tool
+                        </h2>
+                        <p class="text-secondary mb-0">
+                            Scientific physical-layer diagnostic suite designed to assess whether network degradation stems from
+                            electromagnetic interference (EMI), faulty Ethernet cables, queueing congestion, or routing anomalies.
+                        </p>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <a href="{{ url_for('dashboard_view') }}" class="btn btn-primary px-3">
+                            <i class="bi bi-play-circle-fill me-1"></i> Live Monitoring
+                        </a>
+                        <a href="{{ url_for('investigation_view') }}" class="btn btn-warning text-dark px-3 fw-medium">
+                            <i class="bi bi-lightning-charge-fill me-1"></i> Start EMI Test
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- System Diagnostic Readiness Cards -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card bg-card border-secondary h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="text-secondary fs-8 text-uppercase fw-semibold">Ping Engine</span>
+                    <span class="badge bg-success"><i class="bi bi-check-circle-fill me-1"></i>Active</span>
+                </div>
+                <h4 class="h5 fw-bold text-light mb-1">ICMP Subprocess</h4>
+                <p class="fs-8 text-muted mb-0">Direct argument execution without shell. RTT parser calibrated for Windows & Linux.</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-card border-secondary h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="text-secondary fs-8 text-uppercase fw-semibold">Physical Interfaces</span>
+                    <span class="badge bg-info">{{ interfaces|length }} Detected</span>
+                </div>
+                <h4 class="h5 fw-bold text-light mb-1">Hardware Counters</h4>
+                <p class="fs-8 text-muted mb-0">psutil & PowerShell Get-NetAdapterStatistics error and discard delta tracking.</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-card border-secondary h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="text-secondary fs-8 text-uppercase fw-semibold">Packet Dissection</span>
+                    {% if tshark_installed %}
+                    <span class="badge bg-success"><i class="bi bi-check-circle-fill me-1"></i>TShark Found</span>
+                    {% else %}
+                    <span class="badge bg-warning text-dark"><i class="bi bi-info-circle-fill me-1"></i>Python PCAP Engine</span>
+                    {% endif %}
+                </div>
+                <h4 class="h5 fw-bold text-light mb-1">Wireshark / TShark</h4>
+                <p class="fs-8 text-muted mb-0">
+                    {% if tshark_installed %}
+                    Deep TCP retransmission & duplicate ACK analysis ready.
+                    {% else %}
+                    Built-in fallback PCAP parser active. Install Wireshark for deep dissection.
+                    {% endif %}
+                </p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-card border-secondary h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="text-secondary fs-8 text-uppercase fw-semibold">Data Persistence</span>
+                    <span class="badge bg-success"><i class="bi bi-database-check me-1"></i>Connected</span>
+                </div>
+                <h4 class="h5 fw-bold text-light mb-1">SQLite Database</h4>
+                <p class="fs-8 text-muted mb-0">Parameterized storage for measurements, incidents, tests, and PDF exports.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Physical Layer Scientific Notice -->
+<div class="alert alert-dark border-warning bg-card text-light mb-4 shadow-sm" role="alert">
+    <div class="d-flex">
+        <div class="me-3 fs-3 text-warning">
+            <i class="bi bi-exclamation-octagon-fill"></i>
+        </div>
+        <div>
+            <h5 class="fw-bold mb-1 text-warning">Scientific Methodology & Hardware Measurement Reality</h5>
+            <p class="fs-8 text-light-50 mb-0">
+                {{ disclaimer }}
+            </p>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Sessions Table & Available Interfaces -->
+<div class="row g-4">
+    <div class="col-lg-7">
+        <div class="card bg-card border-secondary h-100 shadow-sm">
+            <div class="card-header bg-darker border-secondary d-flex justify-content-between align-items-center">
+                <h5 class="card-title h6 mb-0 text-light fw-bold">
+                    <i class="bi bi-clock-history text-info me-2"></i>Recent Investigation Sessions
+                </h5>
+                <a href="{{ url_for('reports_view') }}" class="btn btn-sm btn-outline-secondary fs-8">View All</a>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-dark table-hover mb-0 fs-8 align-middle">
+                        <thead class="table-secondary text-uppercase fs-9">
+                            <tr>
+                                <th>ID</th>
+                                <th>Session Name</th>
+                                <th>Target</th>
+                                <th>Mode</th>
+                                <th>Status</th>
+                                <th>Created</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for s in recent_sessions %}
+                            <tr>
+                                <td><span class="badge bg-secondary">#{{ s.id }}</span></td>
+                                <td>
+                                    <span class="fw-medium text-light">{{ s.name }}</span>
+                                    {% if s.is_demo %}
+                                    <span class="badge bg-info-subtle text-info fs-9 ms-1">Benchmark</span>
+                                    {% endif %}
+                                </td>
+                                <td><code>{{ s.target }}</code></td>
+                                <td>{{ s.mode|title }}</td>
+                                <td>
+                                    {% if s.status == 'running' %}
+                                    <span class="badge bg-success pulse-animation">Running</span>
+                                    {% elif s.status == 'completed' %}
+                                    <span class="badge bg-primary">Completed</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">{{ s.status|title }}</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-muted">{{ s.created_at[:16] }}</td>
+                                <td>
+                                    <a href="/api/reports/pdf/{{ s.id }}" class="btn btn-sm btn-outline-danger py-0 px-2 fs-8" title="Download PDF Report">
+                                        <i class="bi bi-file-earmark-pdf"></i> PDF
+                                    </a>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="7" class="text-center text-muted py-4">
+                                    No investigation sessions recorded yet. Launch a session or load the benchmark demo dataset!
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Active Local Network Interfaces -->
+    <div class="col-lg-5">
+        <div class="card bg-card border-secondary h-100 shadow-sm">
+            <div class="card-header bg-darker border-secondary">
+                <h5 class="card-title h6 mb-0 text-light fw-bold">
+                    <i class="bi bi-ethernet text-success me-2"></i>Host Network Interfaces
+                </h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="list-group list-group-flush bg-transparent">
+                    {% for iface in interfaces %}
+                    <div class="list-group-item bg-transparent border-secondary text-light d-flex justify-content-between align-items-center py-2 px-3">
+                        <div>
+                            <div class="fw-medium text-light">
+                                {% if iface.is_up %}
+                                <i class="bi bi-check-circle-fill text-success me-1"></i>
+                                {% else %}
+                                <i class="bi bi-x-circle text-muted me-1"></i>
+                                {% endif %}
+                                {{ iface.name }}
+                            </div>
+                            <small class="text-muted fs-8">
+                                IP: {{ iface.ipv4 or 'No IPv4' }} | Speed: {{ iface.speed_mbps }} Mbps
+                            </small>
+                        </div>
+                        <div class="text-end">
+                            <span class="badge bg-secondary fs-8">Rx Drops: {{ iface.rx_drops }}</span>
+                            <span class="badge bg-secondary fs-8">Rx Errs: {{ iface.rx_errors }}</span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
