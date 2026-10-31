@@ -115,6 +115,9 @@ function initActionButtons() {
  * Connect to Server-Sent Events stream for real-time device updates
  */
 function initRealTimeDeviceStream() {
+    if (window.location.search.includes("static_capture=1")) {
+        return; // Skip persistent SSE stream for headless screenshot capture
+    }
     if (typeof EventSource !== "undefined") {
         const sse = new EventSource("/api/devices/stream");
 

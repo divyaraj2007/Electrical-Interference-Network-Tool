@@ -8,14 +8,15 @@
 ---
 
 ## Table of Contents
-1. [Project Overview & Scientific Methodology](#1-project-overview--scientific-methodology)
-2. [End-to-End System Architecture](#2-end-to-end-system-architecture)
-3. [Prerequisites & System Requirements](#3-prerequisites--system-requirements)
-4. [Step-by-Step Installation Guide](#4-step-by-step-installation-guide)
+1. [Visual Interface & Dashboard Gallery](#visual-interface--dashboard-gallery)
+2. [Project Overview & Scientific Methodology](#1-project-overview--scientific-methodology)
+3. [End-to-End System Architecture](#2-end-to-end-system-architecture)
+4. [Prerequisites & System Requirements](#3-prerequisites--system-requirements)
+5. [Step-by-Step Installation Guide](#4-step-by-step-installation-guide)
    - [Windows (PowerShell)](#windows-installation)
    - [Linux / macOS (Bash)](#linux--macos-installation)
-5. [Step-by-Step Execution Guide](#5-step-by-step-execution-guide)
-6. [Complete Step-by-Step Investigation Walkthrough](#6-complete-step-by-step-investigation-walkthrough)
+6. [Step-by-Step Execution Guide](#5-step-by-step-execution-guide)
+7. [Complete Step-by-Step Investigation Walkthrough](#6-complete-step-by-step-investigation-walkthrough)
    - [Phase 1: Baseline Health Assessment (Test A)](#phase-1-baseline-health-assessment-test-a)
    - [Phase 2: Multi-Target Hop Isolation](#phase-2-multi-target-hop-isolation)
    - [Phase 3: Controlled Active Equipment Observation (Test B)](#phase-3-controlled-active-equipment-observation-test-b)
@@ -25,11 +26,43 @@
    - [Phase 7: Wireshark & TShark Packet Dissection](#phase-7-wireshark--tshark-packet-dissection)
    - [Phase 8: Managed Switch SNMP Hardware Counters](#phase-8-managed-switch-snmp-hardware-counters)
    - [Phase 9: Exporting CSV & Generating Technical PDF Reports](#phase-9-exporting-csv--generating-technical-pdf-reports)
-7. [Running Benchmark Demonstration Data](#7-running-benchmark-demonstration-data)
-8. [Running Automated Unit & Security Tests](#8-running-automated-unit--security-tests)
-9. [Detailed Troubleshooting & Hardware Realities](#9-detailed-troubleshooting--hardware-realities)
-10. [Application Security, Reliability & Compliance](#10-application-security-reliability--compliance)
-11. [Two-Device Sender–Receiver Network Testing System](#11-two-device-senderreceiver-network-testing-system)
+8. [Running Benchmark Demonstration Data](#7-running-benchmark-demonstration-data)
+9. [Running Automated Unit & Security Tests](#8-running-automated-unit--security-tests)
+10. [Detailed Troubleshooting & Hardware Realities](#9-detailed-troubleshooting--hardware-realities)
+11. [Application Security, Reliability & Compliance](#10-application-security-reliability--compliance)
+12. [Two-Device Sender–Receiver Network Testing System](#11-two-device-senderreceiver-network-testing-system)
+
+---
+
+## Visual Interface & Dashboard Gallery
+
+### 1. Two-Device Coordinated Testing Dashboard
+Synchronized dual-device testing engine displaying real-time Sender vs. Receiver status, bidirectional throughput, latency, RFC 3550 jitter, and automated root-cause diagnosis.
+![Two-Device Coordinated Testing Dashboard](docs/images/03_two_device_testing.png)
+
+### 2. Distributed Device Management & Hardware Counters
+Centralized node onboarding, live CPU/RAM utilization, link speed, and OS-specific PHY CRC/FCS counter visibility.
+![Device Management](docs/images/04_device_management.png)
+
+### 3. System Overview & Quick Launch Dashboard
+Hardware readiness inspection, active NIC detection, and recent empirical investigation sessions.
+![System Overview](docs/images/01_overview.png)
+
+### 4. Real-Time Network Monitoring Dashboard
+Live dual-axis latency timeline, packet loss tracking, interface counter deltas, and multi-target segment isolation.
+![Live Dashboard](docs/images/02_live_dashboard.png)
+
+### 5. Structured EMI Investigation Protocol (Tests A – D)
+Controlled comparative investigation workflow evaluating baseline, active machinery, cable rerouting, and shielded cable replacement.
+![EMI Investigation](docs/images/05_emi_investigation.png)
+
+### 6. Interactive Network Topology & Hop Isolation Map
+Hop-by-hop latency and error isolation distinguishing local physical drops from intermediate switches and upstream WAN gateways.
+![Network Topology Map](docs/images/06_network_topology.png)
+
+### 7. Historical Reports, CSV Datasets & PDF Exports
+Telemetry database archives, raw timestamped CSV downloads, and publication-grade technical PDF investigation reports.
+![Reports & PDF Export](docs/images/07_reports_export.png)
 
 ---
 

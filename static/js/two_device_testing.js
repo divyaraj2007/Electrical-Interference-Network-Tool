@@ -181,8 +181,22 @@ function initDeviceSelection() {
     const selSender = document.getElementById("sel-sender-device");
     const selReceiver = document.getElementById("sel-receiver-device");
 
+    if (selSender && selSender.options.length > 1 && !selSender.value) {
+        selSender.selectedIndex = 1;
+    }
+    if (selReceiver && selReceiver.options.length > 1 && !selReceiver.value) {
+        selReceiver.selectedIndex = 1;
+    }
+
     selSender?.addEventListener("change", updateSelectedDeviceCards);
     selReceiver?.addEventListener("change", updateSelectedDeviceCards);
+
+    // Auto-load latest test if present in table
+    const firstTestRow = document.querySelector("#tests-history-table tbody tr[data-test-id]");
+    if (firstTestRow) {
+        const latestId = firstTestRow.dataset.testId;
+        loadAndRenderTestResults(latestId);
+    }
 }
 
 function updateSelectedDeviceCards() {
@@ -572,6 +586,9 @@ function updateChartsWithMeasurements(measurements) {
  * Real-Time Telemetry Stream Handler via Server-Sent Events
  */
 function initRealTimeTelemetryStream() {
+    if (window.location.search.includes("static_capture=1")) {
+        return; // Skip persistent SSE stream for headless screenshot capture
+    }
     if (typeof EventSource !== "undefined") {
         const sse = new EventSource("/api/devices/stream");
         sse.onmessage = (event) => {
