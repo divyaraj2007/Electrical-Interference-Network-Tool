@@ -1,0 +1,515 @@
+{% extends "base.html" %}
+
+{% block title %}Coordinated Two-Device Testing - Electrical Interference Network Tool{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <div>
+        <h2 class="h3 fw-bold mb-1 text-light">
+            <i class="bi bi-arrow-left-right text-warning me-2"></i>Coordinated Two-Device Testing System
+        </h2>
+        <p class="text-muted small mb-0">
+            Synchronized end-to-end network telemetry between Sender (Device 1) and Receiver (Device 2) with automated root-cause classification.
+        </p>
+    </div>
+    <div class="d-flex gap-2">
+        <button id="btn-seed-two-dev-demo" class="btn btn-outline-info btn-sm">
+            <i class="bi bi-database-fill-check me-1"></i> Load Two-Device Demo Dataset
+        </button>
+        <button id="btn-preflight-check" class="btn btn-outline-warning btn-sm">
+            <i class="bi bi-shield-check me-1"></i> Verify Connectivity
+        </button>
+        <button id="btn-start-two-test" class="btn btn-success btn-sm">
+            <i class="bi bi-play-fill me-1"></i> Start Coordinated Test
+        </button>
+        <button id="btn-stop-two-test" class="btn btn-danger btn-sm" disabled>
+            <i class="bi bi-stop-fill me-1"></i> Stop Test Remotely
+        </button>
+    </div>
+</div>
+
+<!-- Real-Time Device Cards: Sender vs Receiver -->
+<div class="row g-3 mb-4">
+    <!-- Sender Device Card (Device 1) -->
+    <div class="col-lg-6">
+        <div class="card bg-navy border-primary border-opacity-50 h-100 shadow-sm" id="card-sender-live">
+            <div class="card-header bg-darker border-secondary d-flex justify-content-between align-items-center py-2 px-3">
+                <span class="badge bg-primary text-uppercase fs-8">
+                    <i class="bi bi-arrow-up-right-circle me-1"></i> Device 1: Sender Node
+                </span>
+                <span id="sender-status-pill" class="badge bg-secondary fs-8">
+                    <i class="bi bi-circle-fill me-1 small"></i> OFFLINE
+                </span>
+            </div>
+            <div class="card-body py-2 px-3">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h5 class="card-title fw-bold text-light mb-0" id="sender-display-name">Select Sender Node</h5>
+                    <span class="text-muted font-monospace small" id="sender-display-id">-</span>
+                </div>
+                <div class="row g-2 mb-2 text-center fs-8">
+                    <div class="col-3">
+                        <div class="bg-dark rounded p-1 border border-secondary">
+                            <span class="text-muted d-block fs-9">IP Address</span>
+                            <span class="font-monospace text-light fw-semibold" id="sender-ip">-</span>
+                        </div>
+                    </div>
+                    <div class="col-3">
+                        <div class="bg-dark rounded p-1 border border-secondary">
+                            <span class="text-muted d-block fs-9">NIC / Speed</span>
+                            <span class="text-info" id="sender-nic">-</span>
+                        </div>
+                    </div>
+                    <div class="col-3">
+                        <div class="bg-dark rounded p-1 border border-secondary">
+                            <span class="text-muted d-block fs-9">CPU Usage</span>
+                            <span class="text-light" id="sender-cpu">-</span>
+                        </div>
+                    </div>
+                    <div class="col-3">
+                        <div class="bg-dark rounded p-1 border border-secondary">
+                            <span class="text-muted d-block fs-9">CRC Delta</span>
+                            <span class="text-warning fw-bold" id="sender-crc">-</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="d-flex justify-content-between text-muted fs-9">
+                    <span><i class="bi bi-laptop me-1"></i> OS: <span id="sender-os">-</span></span>
+                    <span><i class="bi bi-clock me-1"></i> Last Seen: <span id="sender-hb">-</span></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Receiver Device Card (Device 2) -->
+    <div class="col-lg-6">
+        <div class="card bg-navy border-success border-opacity-50 h-100 shadow-sm" id="card-receiver-live">
+            <div class="card-header bg-darker border-secondary d-flex justify-content-between align-items-center py-2 px-3">
+                <span class="badge bg-success text-uppercase fs-8">
+                    <i class="bi bi-arrow-down-left-circle me-1"></i> Device 2: Receiver Node
+                </span>
+                <span id="receiver-status-pill" class="badge bg-secondary fs-8">
+                    <i class="bi bi-circle-fill me-1 small"></i> OFFLINE
+                </span>
+            </div>
+            <div class="card-body py-2 px-3">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h5 class="card-title fw-bold text-light mb-0" id="receiver-display-name">Select Receiver Node</h5>
+                    <span class="text-muted font-monospace small" id="receiver-display-id">-</span>
+                </div>
+                <div class="row g-2 mb-2 text-center fs-8">
+                    <div class="col-3">
+                        <div class="bg-dark rounded p-1 border border-secondary">
+                            <span class="text-muted d-block fs-9">IP Address</span>
+                            <span class="font-monospace text-light fw-semibold" id="receiver-ip">-</span>
+                        </div>
+                    </div>
+                    <div class="col-3">
+                        <div class="bg-dark rounded p-1 border border-secondary">
+                            <span class="text-muted d-block fs-9">NIC / Speed</span>
+                            <span class="text-info" id="receiver-nic">-</span>
+                        </div>
+                    </div>
+                    <div class="col-3">
+                        <div class="bg-dark rounded p-1 border border-secondary">
+                            <span class="text-muted d-block fs-9">CPU Usage</span>
+                            <span class="text-light" id="receiver-cpu">-</span>
+                        </div>
+                    </div>
+                    <div class="col-3">
+                        <div class="bg-dark rounded p-1 border border-secondary">
+                            <span class="text-muted d-block fs-9">CRC Delta</span>
+                            <span class="text-warning fw-bold" id="receiver-crc">-</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="d-flex justify-content-between text-muted fs-9">
+                    <span><i class="bi bi-laptop me-1"></i> OS: <span id="receiver-os">-</span></span>
+                    <span><i class="bi bi-clock me-1"></i> Last Seen: <span id="receiver-hb">-</span></span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Live Test Progress Bar & Preflight Banner -->
+<div id="preflight-alert" class="alert alert-info border-secondary d-none py-2 px-3 fs-8 mb-3">
+    <div class="d-flex justify-content-between align-items-center">
+        <span id="preflight-msg"><i class="bi bi-shield-check me-2"></i>Verifying connectivity...</span>
+        <button type="button" class="btn-close btn-close-white" onclick="document.getElementById('preflight-alert').classList.add('d-none')"></button>
+    </div>
+</div>
+
+<div id="test-progress-container" class="card bg-navy border-warning d-none mb-4 p-3 shadow-sm">
+    <div class="d-flex justify-content-between align-items-center mb-1 fs-8">
+        <span class="fw-semibold text-warning">
+            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+            Coordinated Network Testing in Progress...
+        </span>
+        <span class="font-monospace text-light" id="test-elapsed-counter">Elapsed: 00:00</span>
+    </div>
+    <div class="progress bg-dark" style="height: 8px;">
+        <div id="test-progress-bar" class="progress-bar progress-bar-striped progress-bar-animated bg-warning" style="width: 0%"></div>
+    </div>
+</div>
+
+<!-- Test Configuration & Control Panel -->
+<div class="card bg-navy border-secondary shadow-sm mb-4">
+    <div class="card-header bg-darker border-secondary py-2 px-3 d-flex justify-content-between align-items-center">
+        <span class="fw-bold text-light fs-7">
+            <i class="bi bi-sliders me-2 text-primary"></i>Coordinated Test Configuration Panel
+        </span>
+        <span class="badge bg-dark border border-secondary text-secondary">UTC Synchronized Execution</span>
+    </div>
+    <div class="card-body p-3 fs-8">
+        <form id="form-two-device-test">
+            <div class="row g-3">
+                <!-- Device Selection -->
+                <div class="col-md-3">
+                    <label class="form-label fw-medium text-muted">Sender Device (Device 1)</label>
+                    <select class="form-select form-select-sm bg-darker border-secondary text-light" id="sel-sender-device" required>
+                        <option value="">-- Choose Sender Node --</option>
+                        {% for dev in devices %}
+                        {% if dev.device_type == 'sender' %}
+                        <option value="{{ dev.device_id }}">{{ dev.hostname }} ({{ dev.ip_address }}) [{{ dev.status }}]</option>
+                        {% endif %}
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-medium text-muted">Receiver Device (Device 2)</label>
+                    <select class="form-select form-select-sm bg-darker border-secondary text-light" id="sel-receiver-device" required>
+                        <option value="">-- Choose Receiver Node --</option>
+                        {% for dev in devices %}
+                        {% if dev.device_type == 'receiver' %}
+                        <option value="{{ dev.device_id }}">{{ dev.hostname }} ({{ dev.ip_address }}) [{{ dev.status }}]</option>
+                        {% endif %}
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-medium text-muted">Test Direction</label>
+                    <select class="form-select form-select-sm bg-darker border-secondary text-light" id="sel-direction">
+                        <option value="sender_to_receiver" selected>Sender -> Receiver (Forward)</option>
+                        <option value="receiver_to_sender">Receiver -> Sender (Reverse)</option>
+                        <option value="bidirectional">Bidirectional (Both Directions)</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-medium text-muted">Electrical Equipment State</label>
+                    <select class="form-select form-select-sm bg-darker border-secondary text-light" id="sel-eq-state">
+                        <option value="off" selected>De-energized / OFF (Clean Baseline)</option>
+                        <option value="on">Energized / ON (Suspected Active EMI)</option>
+                        <option value="before_cable_replacement">Before Cable Replacement</option>
+                        <option value="after_cable_replacement">After Cable Replacement / Rerouting</option>
+                    </select>
+                </div>
+
+                <!-- Parameters -->
+                <div class="col-md-2">
+                    <label class="form-label fw-medium text-muted">Duration (Seconds)</label>
+                    <input type="number" class="form-control form-control-sm bg-darker border-secondary text-light" id="inp-duration" value="30" min="5" max="300">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-medium text-muted">Packet Size (Bytes)</label>
+                    <input type="number" class="form-control form-control-sm bg-darker border-secondary text-light" id="inp-pkt-size" value="64" min="32" max="1500">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-medium text-muted">Interval (Seconds)</label>
+                    <input type="number" step="0.1" class="form-control form-control-sm bg-darker border-secondary text-light" id="inp-interval" value="0.5" min="0.1" max="5.0">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-medium text-muted">Correlate with Incident (Optional)</label>
+                    <select class="form-select form-select-sm bg-darker border-secondary text-light" id="sel-incident">
+                        <option value="">-- No Incident Link --</option>
+                        {% for inc in incidents %}
+                        <option value="{{ inc.id }}">#{{ inc.id }}: {{ inc.title }} ({{ inc.cable_type }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-medium text-muted">Investigation Test Name</label>
+                    <input type="text" class="form-control form-control-sm bg-darker border-secondary text-light" id="inp-test-name" placeholder="Two-Device EMI Verification">
+                </div>
+
+                <!-- Testing Modes Checkboxes -->
+                <div class="col-12 border-top border-secondary pt-2">
+                    <label class="form-label fw-medium text-muted mb-2 d-block">Enabled Testing Modes</label>
+                    <div class="d-flex flex-wrap gap-3">
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="checkbox" id="chk-ping" value="icmp_ping" checked>
+                            <label class="form-check-label text-light" for="chk-ping">ICMP Ping & RTT</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="checkbox" id="chk-jitter" value="jitter" checked>
+                            <label class="form-check-label text-light" for="chk-jitter">Jitter & Loss</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="checkbox" id="chk-tcp" value="tcp_throughput" checked>
+                            <label class="form-check-label text-light" for="chk-tcp">TCP Bandwidth (iperf3)</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="checkbox" id="chk-udp" value="udp_throughput" checked>
+                            <label class="form-check-label text-light" for="chk-udp">UDP Throughput</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="checkbox" id="chk-mtu" value="mtu" checked>
+                            <label class="form-check-label text-light" for="chk-mtu">MTU & Fragmentation</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="checkbox" id="chk-trace" value="traceroute" checked>
+                            <label class="form-check-label text-light" for="chk-trace">Traceroute Path</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="checkbox" id="chk-dns" value="dns" checked>
+                            <label class="form-check-label text-light" for="chk-dns">DNS Resolution</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="checkbox" id="chk-nic" value="interface_stats" checked>
+                            <label class="form-check-label text-light" for="chk-nic">NIC Error & CRC Deltas</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Live Performance Graphs Grid -->
+<div class="row g-3 mb-4">
+    <!-- Chart 1: RTT & Jitter Streaming -->
+    <div class="col-lg-6">
+        <div class="card bg-navy border-secondary h-100 shadow-sm">
+            <div class="card-header bg-darker border-secondary py-2 px-3 d-flex justify-content-between align-items-center">
+                <span class="fw-bold text-light fs-8">
+                    <i class="bi bi-activity text-info me-2"></i>RTT Latency & RFC 3550 Jitter (ms)
+                </span>
+                <span class="badge bg-secondary font-monospace fs-9" id="rtt-latest-badge">0.0 ms</span>
+            </div>
+            <div class="card-body p-2" style="height: 240px; position: relative;">
+                <canvas id="chart-two-dev-rtt"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chart 2: Bidirectional Throughput -->
+    <div class="col-lg-6">
+        <div class="card bg-navy border-secondary h-100 shadow-sm">
+            <div class="card-header bg-darker border-secondary py-2 px-3 d-flex justify-content-between align-items-center">
+                <span class="fw-bold text-light fs-8">
+                    <i class="bi bi-speedometer2 text-success me-2"></i>Throughput Performance (Mbps)
+                </span>
+                <span class="badge bg-secondary font-monospace fs-9" id="throughput-latest-badge">0.0 Mbps</span>
+            </div>
+            <div class="card-body p-2" style="height: 240px; position: relative;">
+                <canvas id="chart-two-dev-throughput"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chart 3: Packet Loss -->
+    <div class="col-lg-6">
+        <div class="card bg-navy border-secondary h-100 shadow-sm">
+            <div class="card-header bg-darker border-secondary py-2 px-3 d-flex justify-content-between align-items-center">
+                <span class="fw-bold text-light fs-8">
+                    <i class="bi bi-x-circle text-danger me-2"></i>Packet Loss Percentage (%)
+                </span>
+                <span class="badge bg-secondary font-monospace fs-9" id="loss-latest-badge">0.0%</span>
+            </div>
+            <div class="card-body p-2" style="height: 240px; position: relative;">
+                <canvas id="chart-two-dev-loss"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chart 4: Interface Errors & Hardware CRC Deltas -->
+    <div class="col-lg-6">
+        <div class="card bg-navy border-secondary h-100 shadow-sm">
+            <div class="card-header bg-darker border-secondary py-2 px-3 d-flex justify-content-between align-items-center">
+                <span class="fw-bold text-light fs-8">
+                    <i class="bi bi-exclamation-triangle text-warning me-2"></i>Interface & CRC/FCS Error Counters
+                </span>
+                <span class="badge bg-secondary font-monospace fs-9" id="crc-latest-badge">0 Errors</span>
+            </div>
+            <div class="card-body p-2" style="height: 240px; position: relative;">
+                <canvas id="chart-two-dev-errors"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Root Cause Classification & Telemetry Comparison Table -->
+<div class="row g-3 mb-4">
+    <!-- Analysis Diagnosis Card -->
+    <div class="col-lg-5">
+        <div class="card bg-navy border-secondary h-100 shadow-sm" id="card-analysis-diagnosis">
+            <div class="card-header bg-darker border-secondary py-2 px-3 d-flex justify-content-between align-items-center">
+                <span class="fw-bold text-light fs-7">
+                    <i class="bi bi-cpu text-info me-2"></i>Scientific Root-Cause Classification
+                </span>
+                <span id="analysis-category-badge" class="badge bg-secondary fs-8">PENDING TEST</span>
+            </div>
+            <div class="card-body p-3 fs-8">
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="text-muted">Confidence Score:</span>
+                        <span class="fw-bold text-info" id="analysis-confidence">0.0%</span>
+                    </div>
+                    <div class="progress bg-dark" style="height: 6px;">
+                        <div id="analysis-confidence-bar" class="progress-bar bg-info" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <h6 class="fw-bold text-light fs-8 mb-2">Key Diagnostic Findings:</h6>
+                <ul class="list-unstyled mb-3 fs-8 text-secondary-emphasis" id="analysis-findings-list">
+                    <li><i class="bi bi-arrow-right-circle text-muted me-1"></i> Awaiting completed test execution.</li>
+                </ul>
+
+                <h6 class="fw-bold text-light fs-8 mb-2">Engineering Recommendations:</h6>
+                <ul class="list-unstyled mb-0 fs-8 text-secondary-emphasis" id="analysis-recommendations-list">
+                    <li><i class="bi bi-shield-check text-muted me-1"></i> Recommendations will populate after diagnostic run.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Device Comparison Side-by-Side Table -->
+    <div class="col-lg-7">
+        <div class="card bg-navy border-secondary h-100 shadow-sm">
+            <div class="card-header bg-darker border-secondary py-2 px-3 d-flex justify-content-between align-items-center">
+                <span class="fw-bold text-light fs-7">
+                    <i class="bi bi-layout-split text-warning me-2"></i>Device Telemetry Comparison
+                </span>
+                <span class="badge bg-secondary font-monospace fs-9">Sender vs Receiver</span>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-dark table-hover table-bordered mb-0 align-middle fs-8">
+                    <thead class="table-secondary text-dark text-uppercase fs-9">
+                        <tr>
+                            <th>Parameter</th>
+                            <th>Device 1 (Sender)</th>
+                            <th>Device 2 (Receiver)</th>
+                            <th>Evaluation</th>
+                        </tr>
+                    </thead>
+                    <tbody id="comparison-table-body">
+                        <tr>
+                            <td class="fw-medium text-muted">Average Latency (RTT)</td>
+                            <td id="comp-s-rtt" class="font-monospace">-</td>
+                            <td id="comp-r-rtt" class="font-monospace">Echo responder</td>
+                            <td id="comp-eval-rtt">-</td>
+                        </tr>
+                        <tr>
+                            <td class="fw-medium text-muted">Jitter (RFC 3550)</td>
+                            <td id="comp-s-jitter" class="font-monospace">-</td>
+                            <td id="comp-r-jitter" class="font-monospace">-</td>
+                            <td id="comp-eval-jitter">-</td>
+                        </tr>
+                        <tr>
+                            <td class="fw-medium text-muted">Packet Loss Rate</td>
+                            <td id="comp-s-loss" class="font-monospace">-</td>
+                            <td id="comp-r-loss" class="font-monospace">-</td>
+                            <td id="comp-eval-loss">-</td>
+                        </tr>
+                        <tr>
+                            <td class="fw-medium text-muted">Throughput (Mbps)</td>
+                            <td id="comp-s-mbps" class="font-monospace">-</td>
+                            <td id="comp-r-mbps" class="font-monospace">-</td>
+                            <td id="comp-eval-mbps">-</td>
+                        </tr>
+                        <tr>
+                            <td class="fw-medium text-muted">TCP Retransmissions</td>
+                            <td id="comp-s-retrans" class="font-monospace">-</td>
+                            <td id="comp-r-retrans" class="font-monospace">N/A</td>
+                            <td id="comp-eval-retrans">-</td>
+                        </tr>
+                        <tr>
+                            <td class="fw-medium text-muted">Interface Discards / Drops</td>
+                            <td id="comp-s-drops" class="font-monospace">-</td>
+                            <td id="comp-r-drops" class="font-monospace">-</td>
+                            <td id="comp-eval-drops">-</td>
+                        </tr>
+                        <tr>
+                            <td class="fw-medium text-muted">Hardware CRC / FCS Delta</td>
+                            <td id="comp-s-crc" class="font-monospace text-warning">-</td>
+                            <td id="comp-r-crc" class="font-monospace text-warning">-</td>
+                            <td id="comp-eval-crc">-</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Historical Tests & Export Section -->
+<div class="card bg-navy border-secondary shadow-sm mb-4">
+    <div class="card-header bg-darker border-secondary py-2 px-3 d-flex justify-content-between align-items-center">
+        <span class="fw-bold text-light fs-7">
+            <i class="bi bi-clock-history me-2 text-info"></i>Two-Device Testing History & Reports
+        </span>
+        <span class="badge bg-secondary font-monospace" id="tests-count-badge">{{ tests|length }} Tests</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-dark table-hover table-bordered mb-0 align-middle fs-8" id="tests-history-table">
+            <thead class="table-secondary text-dark text-uppercase fs-9">
+                <tr>
+                    <th>Test ID</th>
+                    <th>Name</th>
+                    <th>Sender</th>
+                    <th>Receiver</th>
+                    <th>Direction</th>
+                    <th>Duration</th>
+                    <th>Equipment State</th>
+                    <th>Status</th>
+                    <th>Timestamp (UTC)</th>
+                    <th class="text-center">Reports & Export</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for t in tests %}
+                <tr data-test-id="{{ t.id }}">
+                    <td class="font-monospace fw-semibold text-info">#{{ t.id }}</td>
+                    <td class="text-light fw-medium">{{ t.name }}</td>
+                    <td class="font-monospace small">{{ t.sender_device_id }}</td>
+                    <td class="font-monospace small">{{ t.receiver_device_id }}</td>
+                    <td>{{ t.direction|replace('_', ' ')|title }}</td>
+                    <td>{{ t.duration_sec }}s</td>
+                    <td>
+                        <span class="badge {% if t.equipment_state == 'on' %}bg-danger{% else %}bg-secondary{% endif %} fs-9">
+                            {{ t.equipment_state|upper }}
+                        </span>
+                    </td>
+                    <td>
+                        <span class="badge {% if t.status == 'completed' %}bg-success{% elif t.status == 'running' %}bg-warning text-dark{% else %}bg-secondary{% endif %} fs-9">
+                            {{ t.status|upper }}
+                        </span>
+                    </td>
+                    <td class="text-muted font-monospace fs-9">{{ t.created_at }}</td>
+                    <td class="text-center">
+                        <button class="btn btn-outline-info btn-xs btn-view-test-results me-1" data-test-id="{{ t.id }}" title="View Results">
+                            <i class="bi bi-eye"></i>
+                        </button>
+                        <a href="/api/two-device/reports/csv/{{ t.id }}" class="btn btn-outline-secondary btn-xs me-1" title="Download CSV">
+                            <i class="bi bi-file-earmark-spreadsheet"></i> CSV
+                        </a>
+                        <a href="/api/two-device/reports/pdf/{{ t.id }}" class="btn btn-outline-danger btn-xs" title="Download PDF Report">
+                            <i class="bi bi-file-earmark-pdf"></i> PDF
+                        </a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="10" class="text-center py-4 text-muted">
+                        No two-device tests recorded yet. Run a coordinated test above or load the benchmark demonstration.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_head %}
+<script src="{{ url_for('static', filename='js/two_device_testing.js') }}" defer></script>
+{% endblock %}

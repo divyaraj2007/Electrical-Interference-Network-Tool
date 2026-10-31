@@ -1,0 +1,12 @@
+{
+  "server_url": "http://127.0.0.1:5000",
+  "device_id": "receiver-node-02",
+  "device_name": "Device 2 – Primary Receiver",
+  "device_type": "receiver",
+  "auth_token": "receiver-auth-token-secret-key-67890",
+  "interface_name": "",
+  "heartbeat_interval_sec": 3.0,
+  "verify_ssl": false,
+  "iperf_port": 5201,
+  "agent_version": "1.1.0"
+}

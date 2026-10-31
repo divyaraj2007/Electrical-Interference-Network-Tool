@@ -29,6 +29,7 @@
 8. [Running Automated Unit & Security Tests](#8-running-automated-unit--security-tests)
 9. [Detailed Troubleshooting & Hardware Realities](#9-detailed-troubleshooting--hardware-realities)
 10. [Application Security, Reliability & Compliance](#10-application-security-reliability--compliance)
+11. [Two-Device Sender–Receiver Network Testing System](#11-two-device-senderreceiver-network-testing-system)
 
 ---
 
@@ -385,3 +386,65 @@ PORT=5050 python3 app.py
   - **RFC 1213 / RFC 1643 / RFC 3635**: Management Information Base for Network Management of TCP/IP-based Internets: EtherLike-MIB.
   - **RFC 3550**: RTP: A Transport Protocol for Real-Time Applications (Jitter Calculations).
 - **Safety First**: Non-invasive diagnostic architecture that strictly warns against opening electrical equipment or handling exposed wiring.
+
+---
+
+## 11. Two-Device Sender–Receiver Network Testing System
+
+The system includes a distributed, coordinated two-device testing architecture designed for cross-computer validation:
+- **Device 1 (Sender):** Runs the lightweight Sender Agent (`agents/sender/sender_agent.py`).
+- **Device 2 (Receiver):** Runs the Receiver Agent (`agents/receiver/receiver_agent.py`) with an integrated iperf3 and pure-Python socket server.
+- **Central Flask Server:** Coordinates synchronized tests, receives real-time telemetry via Server-Sent Events (SSE), and generates combined PDF/CSV investigation reports.
+
+### Architecture
+```text
+agents/
+    sender/
+        sender_agent.py          # Device 1 Sender service
+        sender_config.json       # Sender configuration
+    receiver/
+        receiver_agent.py        # Device 2 Receiver service
+        receiver_config.json     # Receiver configuration
+    common/
+        network_tests.py         # Coordinated test suite orchestrator
+        interface_monitor.py     # NIC counter deltas & rollover detection
+        ping_monitor.py          # Ping, RTT, RFC 3550 jitter, and MTU testing
+        traceroute.py            # Hop-by-hop latency and route analysis
+        dns_test.py              # DNS resolution latency testing
+        iperf_manager.py         # iperf3 client/server + native Python socket fallback
+        packet_capture.py        # Retransmission and packet stream inspection
+        system_info.py           # Hardware statistics & physical counter detection
+        agent_communication.py   # Token-authenticated HTTP/HTTPS client
+        security.py              # Auth tokens, SSL, and injection sanitization
+    install_windows.bat          # Windows batch installer
+    install_windows.ps1          # Windows PowerShell installer
+    install_linux.sh             # Linux installer (Ubuntu, Kali Linux, Debian, RHEL)
+    requirements.txt             # Agent dependencies
+```
+
+### Installation & Execution
+
+#### On Device 1 (Sender) - Windows 10/11
+```powershell
+cd agents
+.\install_windows.ps1
+.\.venv\Scripts\python.exe sender\sender_agent.py --server http://<FLASK_IP>:5000 --id sender-node-01
+```
+
+#### On Device 2 (Receiver) - Ubuntu / Kali Linux
+```bash
+cd agents
+chmod +x install_linux.sh
+./install_linux.sh
+./.venv/bin/python3 receiver/receiver_agent.py --server http://<FLASK_IP>:5000 --id receiver-node-02
+```
+
+### Dashboard Features
+1. **Device Management (`/devices`):** Real-time node onboarding, hardware interface telemetry, CPU/RAM usage, and connection status.
+2. **Two-Device Testing Dashboard (`/two-device-testing`):**
+   - Pre-flight connectivity verification.
+   - Forward (Sender -> Receiver), Reverse (Receiver -> Sender), and Bidirectional testing modes.
+   - Real-time dual-device charts for Latency/Jitter, Throughput, Packet Loss, and CRC/FCS Errors.
+   - Automated root-cause classification distinguishing EMI, Cable defects, Node resource exhaustion, Switch discards, and Congestion.
+   - Comprehensive CSV and publication-grade PDF investigation reports.
+

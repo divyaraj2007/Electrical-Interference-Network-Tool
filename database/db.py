@@ -199,12 +199,128 @@ def init_db(db_path: str = DEFAULT_DB_PATH) -> None:
     );
     """)
 
+    # 9. Registered Devices (Sender & Receiver Agents)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS devices (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        device_id TEXT UNIQUE NOT NULL,
+        device_type TEXT NOT NULL DEFAULT 'sender', -- 'sender', 'receiver'
+        hostname TEXT,
+        ip_address TEXT,
+        os_info TEXT,
+        interfaces_json TEXT,
+        agent_version TEXT DEFAULT '1.0.0',
+        auth_token TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'offline', -- 'online', 'offline', 'testing'
+        last_heartbeat TEXT,
+        cpu_pct REAL DEFAULT 0.0,
+        mem_pct REAL DEFAULT 0.0,
+        active_interface TEXT,
+        link_speed_mbps INTEGER DEFAULT 0,
+        rx_errors INTEGER DEFAULT 0,
+        tx_errors INTEGER DEFAULT 0,
+        rx_drops INTEGER DEFAULT 0,
+        tx_drops INTEGER DEFAULT 0,
+        crc_fcs_errors INTEGER DEFAULT 0,
+        crc_supported INTEGER DEFAULT 0, -- 1 if supported, 0 if unsupported/not exposed
+        config_json TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+    );
+    """)
+
+    # 10. Coordinated Two-Device Testing Sessions
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS two_device_tests (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        test_uuid TEXT UNIQUE NOT NULL,
+        name TEXT NOT NULL,
+        incident_id INTEGER,
+        sender_device_id TEXT NOT NULL,
+        receiver_device_id TEXT NOT NULL,
+        direction TEXT NOT NULL DEFAULT 'sender_to_receiver', -- 'sender_to_receiver', 'receiver_to_sender', 'bidirectional'
+        test_modes_json TEXT NOT NULL,
+        duration_sec INTEGER NOT NULL DEFAULT 30,
+        packet_size_bytes INTEGER NOT NULL DEFAULT 64,
+        interval_sec REAL NOT NULL DEFAULT 1.0,
+        equipment_state TEXT DEFAULT 'off', -- 'on', 'off', 'before_cable_replacement', 'after_cable_replacement'
+        status TEXT NOT NULL DEFAULT 'created', -- 'created', 'running', 'completed', 'stopped', 'failed'
+        start_time TEXT,
+        end_time TEXT,
+        summary_json TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+        FOREIGN KEY (incident_id) REFERENCES incidents(id) ON DELETE SET NULL
+    );
+    """)
+
+    # 11. Two-Device Telemetry & Measurements
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS two_device_measurements (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        test_id INTEGER NOT NULL,
+        device_id TEXT NOT NULL,
+        device_role TEXT NOT NULL, -- 'sender', 'receiver'
+        metric_type TEXT NOT NULL, -- 'ping', 'jitter', 'loss', 'throughput_tcp', 'throughput_udp', 'dns', 'traceroute', 'mtu', 'interface_stats', 'system_stats', 'error'
+        sequence_num INTEGER DEFAULT 0,
+        value_numeric REAL DEFAULT 0.0,
+        data_json TEXT NOT NULL,
+        timestamp TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+        FOREIGN KEY (test_id) REFERENCES two_device_tests(id) ON DELETE CASCADE
+    );
+    """)
+
+    # 12. Two-Device Investigation & EMI Analysis
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS two_device_analysis (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        test_id INTEGER NOT NULL,
+        incident_id INTEGER,
+        category TEXT NOT NULL,
+        confidence_score REAL NOT NULL,
+        rtt_avg REAL,
+        jitter_ms REAL,
+        loss_pct REAL,
+        sender_throughput_mbps REAL,
+        receiver_throughput_mbps REAL,
+        retransmissions INTEGER DEFAULT 0,
+        sender_errors_delta INTEGER DEFAULT 0,
+        receiver_errors_delta INTEGER DEFAULT 0,
+        sender_crc_delta INTEGER DEFAULT 0,
+        receiver_crc_delta INTEGER DEFAULT 0,
+        findings_json TEXT,
+        recommendations_json TEXT,
+        timestamp TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+        FOREIGN KEY (test_id) REFERENCES two_device_tests(id) ON DELETE CASCADE,
+        FOREIGN KEY (incident_id) REFERENCES incidents(id) ON DELETE SET NULL
+    );
+    """)
+
+    # 13. Agent Tasks Queue
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS agent_tasks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        device_id TEXT NOT NULL,
+        task_type TEXT NOT NULL,
+        task_id TEXT NOT NULL,
+        payload_json TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending', -- 'pending', 'dispatched', 'completed', 'failed', 'cancelled'
+        result_json TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+        updated_at TEXT
+    );
+    """)
+
     # Indexes for performance
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_ping_session ON ping_measurements(session_id);")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_ping_time ON ping_measurements(timestamp);")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_ifstats_session ON interface_stats(session_id);")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_captures_session ON packet_captures(session_id);")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_tests_incident ON comparative_tests(incident_id);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_devices_id ON devices(device_id);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_devices_token ON devices(auth_token);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_two_tests_uuid ON two_device_tests(test_uuid);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_two_meas_test ON two_device_measurements(test_id);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_two_meas_time ON two_device_measurements(timestamp);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_agent_tasks_dev ON agent_tasks(device_id, status);")
 
     conn.commit()
     conn.close()
@@ -718,3 +834,553 @@ def get_snmp_configs(db_path: str = DEFAULT_DB_PATH) -> List[Dict[str, Any]]:
     rows = cursor.fetchall()
     conn.close()
     return [dict(r) for r in rows]
+
+
+# ============================================================================
+# Two-Device System & Agent Management Operations
+# ============================================================================
+
+def upsert_device(device_data: Dict[str, Any], db_path: str = DEFAULT_DB_PATH) -> Dict[str, Any]:
+    """Register or update an agent device (Sender or Receiver)."""
+    conn = get_db_connection(db_path)
+    cursor = conn.cursor()
+    dev_id = device_data.get("device_id")
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    cursor.execute("SELECT * FROM devices WHERE device_id = ?", (dev_id,))
+    existing = cursor.fetchone()
+
+    interfaces_json = device_data.get("interfaces_json")
+    if isinstance(interfaces_json, (list, dict)):
+        interfaces_json = json.dumps(interfaces_json)
+
+    config_json = device_data.get("config_json")
+    if isinstance(config_json, (list, dict)):
+        config_json = json.dumps(config_json)
+
+    if existing:
+        cursor.execute("""
+            UPDATE devices SET
+                device_type = ?,
+                hostname = ?,
+                ip_address = ?,
+                os_info = ?,
+                interfaces_json = coalesce(?, interfaces_json),
+                agent_version = ?,
+                auth_token = coalesce(?, auth_token),
+                status = 'online',
+                last_heartbeat = ?,
+                cpu_pct = ?,
+                mem_pct = ?,
+                active_interface = ?,
+                link_speed_mbps = ?,
+                rx_errors = ?,
+                tx_errors = ?,
+                rx_drops = ?,
+                tx_drops = ?,
+                crc_fcs_errors = ?,
+                crc_supported = ?,
+                config_json = coalesce(?, config_json)
+            WHERE device_id = ?
+        """, (
+            device_data.get("device_type", existing["device_type"]),
+            device_data.get("hostname", existing["hostname"]),
+            device_data.get("ip_address", existing["ip_address"]),
+            device_data.get("os_info", existing["os_info"]),
+            interfaces_json,
+            device_data.get("agent_version", existing["agent_version"]),
+            device_data.get("auth_token", existing["auth_token"]),
+            now,
+            device_data.get("cpu_pct", existing["cpu_pct"] or 0.0),
+            device_data.get("mem_pct", existing["mem_pct"] or 0.0),
+            device_data.get("active_interface", existing["active_interface"]),
+            device_data.get("link_speed_mbps", existing["link_speed_mbps"] or 0),
+            device_data.get("rx_errors", existing["rx_errors"] or 0),
+            device_data.get("tx_errors", existing["tx_errors"] or 0),
+            device_data.get("rx_drops", existing["rx_drops"] or 0),
+            device_data.get("tx_drops", existing["tx_drops"] or 0),
+            device_data.get("crc_fcs_errors", existing["crc_fcs_errors"] or 0),
+            device_data.get("crc_supported", existing["crc_supported"] or 0),
+            config_json,
+            dev_id
+        ))
+    else:
+        cursor.execute("""
+            INSERT INTO devices (
+                device_id, device_type, hostname, ip_address, os_info,
+                interfaces_json, agent_version, auth_token, status,
+                last_heartbeat, cpu_pct, mem_pct, active_interface,
+                link_speed_mbps, rx_errors, tx_errors, rx_drops, tx_drops,
+                crc_fcs_errors, crc_supported, config_json, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'online', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            dev_id,
+            device_data.get("device_type", "sender"),
+            device_data.get("hostname", "Unknown"),
+            device_data.get("ip_address", "127.0.0.1"),
+            device_data.get("os_info", "Unknown OS"),
+            interfaces_json,
+            device_data.get("agent_version", "1.0.0"),
+            device_data.get("auth_token", ""),
+            now,
+            device_data.get("cpu_pct", 0.0),
+            device_data.get("mem_pct", 0.0),
+            device_data.get("active_interface", ""),
+            device_data.get("link_speed_mbps", 0),
+            device_data.get("rx_errors", 0),
+            device_data.get("tx_errors", 0),
+            device_data.get("rx_drops", 0),
+            device_data.get("tx_drops", 0),
+            device_data.get("crc_fcs_errors", 0),
+            device_data.get("crc_supported", 0),
+            config_json,
+            now
+        ))
+
+    conn.commit()
+    cursor.execute("SELECT * FROM devices WHERE device_id = ?", (dev_id,))
+    row = cursor.fetchone()
+    conn.close()
+    return _format_device_row(row) if row else {}
+
+
+def _format_device_row(row) -> Dict[str, Any]:
+    if not row:
+        return {}
+    d = dict(row)
+    try:
+        d["interfaces"] = json.loads(d.get("interfaces_json") or "[]")
+    except Exception:
+        d["interfaces"] = []
+    try:
+        d["config"] = json.loads(d.get("config_json") or "{}")
+    except Exception:
+        d["config"] = {}
+
+    # Check online/offline dynamically: offline if last_heartbeat is older than 25 seconds
+    if d.get("last_heartbeat"):
+        try:
+            hb_time = datetime.strptime(d["last_heartbeat"], "%Y-%m-%d %H:%M:%S")
+            diff = (datetime.now() - hb_time).total_seconds()
+            if diff > 25.0:
+                d["status"] = "offline"
+        except Exception:
+            pass
+    return d
+
+
+def get_device_by_id(device_id: str, db_path: str = DEFAULT_DB_PATH) -> Optional[Dict[str, Any]]:
+    """Retrieve device by device_id."""
+    conn = get_db_connection(db_path)
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM devices WHERE device_id = ?", (device_id,))
+    row = cursor.fetchone()
+    conn.close()
+    return _format_device_row(row) if row else None
+
+
+def get_device_by_token(auth_token: str, db_path: str = DEFAULT_DB_PATH) -> Optional[Dict[str, Any]]:
+    """Retrieve device by auth token."""
+    if not auth_token:
+        return None
+    conn = get_db_connection(db_path)
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM devices WHERE auth_token = ?", (auth_token,))
+    row = cursor.fetchone()
+    conn.close()
+    return _format_device_row(row) if row else None
+
+
+def get_all_devices(db_path: str = DEFAULT_DB_PATH) -> List[Dict[str, Any]]:
+    """List all registered devices with their current health and online status."""
+    conn = get_db_connection(db_path)
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM devices ORDER BY id ASC")
+    rows = cursor.fetchall()
+    conn.close()
+    return [_format_device_row(r) for r in rows]
+
+
+def update_device_heartbeat(device_id: str, telemetry: Dict[str, Any], db_path: str = DEFAULT_DB_PATH) -> bool:
+    """Update last heartbeat timestamp and real-time interface telemetry."""
+    conn = get_db_connection(db_path)
+    cursor = conn.cursor()
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    cursor.execute("""
+        UPDATE devices SET
+            last_heartbeat = ?,
+            status = 'online',
+            cpu_pct = coalesce(?, cpu_pct),
+            mem_pct = coalesce(?, mem_pct),
+            active_interface = coalesce(?, active_interface),
+            link_speed_mbps = coalesce(?, link_speed_mbps),
+            rx_errors = coalesce(?, rx_errors),
+            tx_errors = coalesce(?, tx_errors),
+            rx_drops = coalesce(?, rx_drops),
+            tx_drops = coalesce(?, tx_drops),
+            crc_fcs_errors = coalesce(?, crc_fcs_errors),
+            crc_supported = coalesce(?, crc_supported)
+        WHERE device_id = ?
+    """, (
+        now,
+        telemetry.get("cpu_pct"),
+        telemetry.get("mem_pct"),
+        telemetry.get("active_interface"),
+        telemetry.get("link_speed_mbps"),
+        telemetry.get("rx_errors"),
+        telemetry.get("tx_errors"),
+        telemetry.get("rx_drops"),
+        telemetry.get("tx_drops"),
+        telemetry.get("crc_fcs_errors"),
+        telemetry.get("crc_supported"),
+        device_id
+    ))
+    updated = cursor.rowcount > 0
+    conn.commit()
+    conn.close()
+    return updated
+
+
+def update_device_status(device_id: str, status: str, db_path: str = DEFAULT_DB_PATH) -> None:
+    """Update device status ('online', 'offline', 'testing')."""
+    conn = get_db_connection(db_path)
+    cursor = conn.cursor()
+    cursor.execute("UPDATE devices SET status = ? WHERE device_id = ?", (status, device_id))
+    conn.commit()
+    conn.close()
+
+
+def delete_device(device_id: str, db_path: str = DEFAULT_DB_PATH) -> bool:
+    """Delete a registered device."""
+    conn = get_db_connection(db_path)
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM devices WHERE device_id = ?", (device_id,))
+    deleted = cursor.rowcount > 0
+    cursor.execute("DELETE FROM agent_tasks WHERE device_id = ?", (device_id,))
+    conn.commit()
+    conn.close()
+    return deleted
+
+
+# ============================================================================
+# Agent Task Queue Operations
+# ============================================================================
+
+def create_agent_task(device_id: str, task_type: str, payload: Dict[str, Any],
+                      task_id: Optional[str] = None, db_path: str = DEFAULT_DB_PATH) -> int:
+    """Queue a task command for an agent."""
+    import uuid
+    if not task_id:
+        task_id = str(uuid.uuid4())
+    conn = get_db_connection(db_path)
+    cursor = conn.cursor()
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    cursor.execute("""
+        INSERT INTO agent_tasks (device_id, task_type, task_id, payload_json, status, created_at)
+        VALUES (?, ?, ?, ?, 'pending', ?)
+    """, (device_id, task_type, task_id, json.dumps(payload), now))
+    row_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+    return row_id
+
+
+def get_pending_agent_tasks(device_id: str, db_path: str = DEFAULT_DB_PATH) -> List[Dict[str, Any]]:
+    """Retrieve pending tasks for an agent and mark them dispatched."""
+    conn = get_db_connection(db_path)
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT * FROM agent_tasks
+        WHERE device_id = ? AND status = 'pending'
+        ORDER BY id ASC
+    """, (device_id,))
+    rows = cursor.fetchall()
+    tasks = []
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    for r in rows:
+        t = dict(r)
+        try:
+            t["payload"] = json.loads(t.get("payload_json") or "{}")
+        except Exception:
+            t["payload"] = {}
+        tasks.append(t)
+        cursor.execute("UPDATE agent_tasks SET status = 'dispatched', updated_at = ? WHERE id = ?", (now, r["id"]))
+    conn.commit()
+    conn.close()
+    return tasks
+
+
+def update_agent_task(task_id: str, status: str, result: Optional[Dict[str, Any]] = None,
+                      db_path: str = DEFAULT_DB_PATH) -> bool:
+    """Update task completion status and result."""
+    conn = get_db_connection(db_path)
+    cursor = conn.cursor()
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    res_str = json.dumps(result) if result is not None else None
+    cursor.execute("""
+        UPDATE agent_tasks SET status = ?, result_json = coalesce(?, result_json), updated_at = ?
+        WHERE task_id = ?
+    """, (status, res_str, now, task_id))
+    updated = cursor.rowcount > 0
+    conn.commit()
+    conn.close()
+    return updated
+
+
+# ============================================================================
+# Two-Device Testing Session Operations
+# ============================================================================
+
+def create_two_device_test(data: Dict[str, Any], db_path: str = DEFAULT_DB_PATH) -> int:
+    """Create a coordinated two-device test record."""
+    import uuid
+    conn = get_db_connection(db_path)
+    cursor = conn.cursor()
+    test_uuid = data.get("test_uuid") or str(uuid.uuid4())
+    modes = data.get("test_modes", [])
+    if isinstance(modes, list):
+        modes_json = json.dumps(modes)
+    else:
+        modes_json = str(modes)
+
+    cursor.execute("""
+        INSERT INTO two_device_tests (
+            test_uuid, name, incident_id, sender_device_id, receiver_device_id,
+            direction, test_modes_json, duration_sec, packet_size_bytes,
+            interval_sec, equipment_state, status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'created')
+    """, (
+        test_uuid,
+        data.get("name", f"Two-Device Test {datetime.now().strftime('%Y-%m-%d %H:%M')}"),
+        data.get("incident_id"),
+        data.get("sender_device_id"),
+        data.get("receiver_device_id"),
+        data.get("direction", "sender_to_receiver"),
+        modes_json,
+        int(data.get("duration_sec", 30)),
+        int(data.get("packet_size_bytes", 64)),
+        float(data.get("interval_sec", 1.0)),
+        data.get("equipment_state", "off")
+    ))
+    test_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+    return test_id
+
+
+def get_two_device_test(test_id: int, db_path: str = DEFAULT_DB_PATH) -> Optional[Dict[str, Any]]:
+    """Retrieve two-device test by ID."""
+    conn = get_db_connection(db_path)
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM two_device_tests WHERE id = ?", (test_id,))
+    row = cursor.fetchone()
+    conn.close()
+    if not row:
+        return None
+    d = dict(row)
+    try:
+        d["test_modes"] = json.loads(d.get("test_modes_json") or "[]")
+    except Exception:
+        d["test_modes"] = []
+    try:
+        d["summary"] = json.loads(d.get("summary_json") or "{}")
+    except Exception:
+        d["summary"] = {}
+    return d
+
+
+def get_two_device_test_by_uuid(test_uuid: str, db_path: str = DEFAULT_DB_PATH) -> Optional[Dict[str, Any]]:
+    """Retrieve two-device test by UUID."""
+    conn = get_db_connection(db_path)
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM two_device_tests WHERE test_uuid = ?", (test_uuid,))
+    row = cursor.fetchone()
+    conn.close()
+    if not row:
+        return None
+    d = dict(row)
+    try:
+        d["test_modes"] = json.loads(d.get("test_modes_json") or "[]")
+    except Exception:
+        d["test_modes"] = []
+    try:
+        d["summary"] = json.loads(d.get("summary_json") or "{}")
+    except Exception:
+        d["summary"] = {}
+    return d
+
+
+def update_two_device_test(test_id: int, update_data: Dict[str, Any], db_path: str = DEFAULT_DB_PATH) -> None:
+    """Update status, timestamps, or summary of a two-device test."""
+    conn = get_db_connection(db_path)
+    cursor = conn.cursor()
+    summary = update_data.get("summary")
+    summary_json = json.dumps(summary) if isinstance(summary, (dict, list)) else summary
+
+    cursor.execute("""
+        UPDATE two_device_tests SET
+            status = coalesce(?, status),
+            start_time = coalesce(?, start_time),
+            end_time = coalesce(?, end_time),
+            summary_json = coalesce(?, summary_json)
+        WHERE id = ?
+    """, (
+        update_data.get("status"),
+        update_data.get("start_time"),
+        update_data.get("end_time"),
+        summary_json,
+        test_id
+    ))
+    conn.commit()
+    conn.close()
+
+
+def get_all_two_device_tests(limit: int = 50, db_path: str = DEFAULT_DB_PATH) -> List[Dict[str, Any]]:
+    """List historical two-device tests."""
+    conn = get_db_connection(db_path)
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM two_device_tests ORDER BY id DESC LIMIT ?", (limit,))
+    rows = cursor.fetchall()
+    conn.close()
+    res = []
+    for r in rows:
+        d = dict(r)
+        try:
+            d["test_modes"] = json.loads(d.get("test_modes_json") or "[]")
+        except Exception:
+            d["test_modes"] = []
+        try:
+            d["summary"] = json.loads(d.get("summary_json") or "{}")
+        except Exception:
+            d["summary"] = {}
+        res.append(d)
+    return res
+
+
+def record_two_device_measurement(data: Dict[str, Any], db_path: str = DEFAULT_DB_PATH) -> int:
+    """Record an individual metric or telemetry point from Sender or Receiver."""
+    conn = get_db_connection(db_path)
+    cursor = conn.cursor()
+    data_json = data.get("data")
+    if isinstance(data_json, (dict, list)):
+        data_json = json.dumps(data_json)
+    elif data_json is None:
+        data_json = "{}"
+
+    now = data.get("timestamp") or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    cursor.execute("""
+        INSERT INTO two_device_measurements (
+            test_id, device_id, device_role, metric_type, sequence_num,
+            value_numeric, data_json, timestamp
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        data.get("test_id"),
+        data.get("device_id"),
+        data.get("device_role", "sender"),
+        data.get("metric_type", "ping"),
+        data.get("sequence_num", 0),
+        data.get("value_numeric", 0.0),
+        data_json,
+        now
+    ))
+    mid = cursor.lastrowid
+    conn.commit()
+    conn.close()
+    return mid
+
+
+def get_two_device_measurements(test_id: int, metric_type: Optional[str] = None,
+                                limit: int = 1000, db_path: str = DEFAULT_DB_PATH) -> List[Dict[str, Any]]:
+    """Fetch measurements for a specific test."""
+    conn = get_db_connection(db_path)
+    cursor = conn.cursor()
+    if metric_type:
+        cursor.execute("""
+            SELECT * FROM two_device_measurements
+            WHERE test_id = ? AND metric_type = ?
+            ORDER BY id ASC LIMIT ?
+        """, (test_id, metric_type, limit))
+    else:
+        cursor.execute("""
+            SELECT * FROM two_device_measurements
+            WHERE test_id = ?
+            ORDER BY id ASC LIMIT ?
+        """, (test_id, limit))
+    rows = cursor.fetchall()
+    conn.close()
+    res = []
+    for r in rows:
+        d = dict(r)
+        try:
+            d["data"] = json.loads(d.get("data_json") or "{}")
+        except Exception:
+            d["data"] = {}
+        res.append(d)
+    return res
+
+
+def record_two_device_analysis(data: Dict[str, Any], db_path: str = DEFAULT_DB_PATH) -> int:
+    """Persist synthesized analysis and root cause finding for a two-device test."""
+    conn = get_db_connection(db_path)
+    cursor = conn.cursor()
+    findings = data.get("findings", [])
+    findings_json = json.dumps(findings) if isinstance(findings, list) else str(findings)
+    recs = data.get("recommendations", [])
+    recs_json = json.dumps(recs) if isinstance(recs, list) else str(recs)
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    cursor.execute("""
+        INSERT INTO two_device_analysis (
+            test_id, incident_id, category, confidence_score, rtt_avg,
+            jitter_ms, loss_pct, sender_throughput_mbps, receiver_throughput_mbps,
+            retransmissions, sender_errors_delta, receiver_errors_delta,
+            sender_crc_delta, receiver_crc_delta, findings_json, recommendations_json,
+            timestamp
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        data.get("test_id"),
+        data.get("incident_id"),
+        data.get("category", "insufficient_evidence"),
+        data.get("confidence_score", 0.0),
+        data.get("rtt_avg", 0.0),
+        data.get("jitter_ms", 0.0),
+        data.get("loss_pct", 0.0),
+        data.get("sender_throughput_mbps", 0.0),
+        data.get("receiver_throughput_mbps", 0.0),
+        data.get("retransmissions", 0),
+        data.get("sender_errors_delta", 0),
+        data.get("receiver_errors_delta", 0),
+        data.get("sender_crc_delta", 0),
+        data.get("receiver_crc_delta", 0),
+        findings_json,
+        recs_json,
+        now
+    ))
+    aid = cursor.lastrowid
+    conn.commit()
+    conn.close()
+    return aid
+
+
+def get_two_device_analysis(test_id: int, db_path: str = DEFAULT_DB_PATH) -> Optional[Dict[str, Any]]:
+    """Retrieve analysis record for a two-device test."""
+    conn = get_db_connection(db_path)
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM two_device_analysis WHERE test_id = ? ORDER BY id DESC LIMIT 1", (test_id,))
+    row = cursor.fetchone()
+    conn.close()
+    if not row:
+        return None
+    d = dict(row)
+    try:
+        d["findings"] = json.loads(d.get("findings_json") or "[]")
+    except Exception:
+        d["findings"] = []
+    try:
+        d["recommendations"] = json.loads(d.get("recommendations_json") or "[]")
+    except Exception:
+        d["recommendations"] = []
+    return d
+

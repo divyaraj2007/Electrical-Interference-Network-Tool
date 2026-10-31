@@ -1,0 +1,12 @@
+{
+  "server_url": "http://127.0.0.1:5000",
+  "device_id": "sender-node-01",
+  "device_name": "Device 1 - Primary Sender",
+  "device_type": "sender",
+  "auth_token": "sender-auth-token-secret-key-12345",
+  "interface_name": "",
+  "heartbeat_interval_sec": 3.0,
+  "verify_ssl": false,
+  "iperf_port": 5201,
+  "agent_version": "1.1.0"
+}

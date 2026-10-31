@@ -1,0 +1,257 @@
+{% extends "base.html" %}
+
+{% block title %}Device Management - Electrical Interference Network Tool{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <div>
+        <h2 class="h3 fw-bold mb-1 text-light">
+            <i class="bi bi-hdd-network text-info me-2"></i>Network Testing Device Management
+        </h2>
+        <p class="text-muted small mb-0">
+            Register and manage distributed Sender (Device 1) and Receiver (Device 2) testing agents.
+        </p>
+    </div>
+    <div class="d-flex gap-2">
+        <button id="btn-refresh-devices" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-clockwise me-1"></i> Refresh Devices
+        </button>
+        <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#registerDeviceModal">
+            <i class="bi bi-plus-circle me-1"></i> Register New Device
+        </button>
+    </div>
+</div>
+
+<!-- Scientific Hardware Counter Notice -->
+<div class="alert alert-dark border-secondary d-flex align-items-start gap-2 py-2 px-3 fs-8 mb-4">
+    <i class="bi bi-info-circle text-info fs-6 mt-1 flex-shrink-0"></i>
+    <div class="text-secondary-emphasis">
+        <strong>Hardware Diagnostics Disclaimer:</strong> {{ disclaimer }}
+    </div>
+</div>
+
+<!-- Devices Overview Cards Grid -->
+<div class="row g-4 mb-4" id="devices-cards-container">
+    {% for dev in devices %}
+    <div class="col-md-6 col-xl-4 device-card-col" data-device-id="{{ dev.device_id }}">
+        <div class="card bg-navy border-secondary h-100 shadow-sm">
+            <div class="card-header bg-darker border-secondary d-flex justify-content-between align-items-center py-2 px-3">
+                <span class="badge {% if dev.device_type == 'sender' %}bg-primary{% else %}bg-success{% endif %} text-uppercase fs-8">
+                    <i class="bi {% if dev.device_type == 'sender' %}bi-arrow-up-right-circle{% else %}bi-arrow-down-left-circle{% endif %} me-1"></i>
+                    {{ dev.device_type }}
+                </span>
+                <span class="badge rounded-pill {% if dev.status == 'online' %}bg-success{% elif dev.status == 'testing' %}bg-warning text-dark{% else %}bg-secondary{% endif %} fs-8 dev-status-badge">
+                    <i class="bi bi-circle-fill me-1 small"></i> {{ dev.status|upper }}
+                </span>
+            </div>
+            <div class="card-body">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <h5 class="card-title fw-bold text-light mb-0">{{ dev.hostname or dev.device_id }}</h5>
+                    <span class="text-muted font-monospace small">{{ dev.device_id }}</span>
+                </div>
+                <div class="text-muted small mb-3">
+                    <i class="bi bi-laptop me-1"></i> {{ dev.os_info or 'Unknown OS' }}
+                </div>
+
+                <div class="border rounded border-secondary p-2 bg-darker small mb-3">
+                    <div class="d-flex justify-content-between py-1 border-bottom border-dark">
+                        <span class="text-muted">IP Address:</span>
+                        <span class="fw-semibold text-light font-monospace">{{ dev.ip_address }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between py-1 border-bottom border-dark">
+                        <span class="text-muted">Active Interface:</span>
+                        <span class="text-info fw-medium">{{ dev.active_interface or 'eth0' }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between py-1 border-bottom border-dark">
+                        <span class="text-muted">Link Speed:</span>
+                        <span class="text-light">{{ dev.link_speed_mbps }} Mbps</span>
+                    </div>
+                    <div class="d-flex justify-content-between py-1 border-bottom border-dark">
+                        <span class="text-muted">Agent Version:</span>
+                        <span class="text-secondary">v{{ dev.agent_version }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between py-1">
+                        <span class="text-muted">Hardware CRC Support:</span>
+                        <span class="badge {% if dev.crc_supported %}bg-info text-dark{% else %}bg-dark border border-secondary text-secondary{% endif %} fs-9">
+                            {% if dev.crc_supported %}Exposed (ethtool/PHY){% else %}Unsupported by OS{% endif %}
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Live Resources Telemetry -->
+                <div class="row g-2 text-center fs-8 mb-3">
+                    <div class="col-6">
+                        <div class="bg-dark rounded p-2 border border-secondary">
+                            <span class="text-muted d-block small">CPU Usage</span>
+                            <span class="fw-bold text-light dev-cpu-val">{{ dev.cpu_pct or 0.0 }}%</span>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="bg-dark rounded p-2 border border-secondary">
+                            <span class="text-muted d-block small">Memory</span>
+                            <span class="fw-bold text-light dev-mem-val">{{ dev.mem_pct or 0.0 }}%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="text-muted fs-8 d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-clock-history me-1"></i> Last Seen:</span>
+                    <span class="dev-last-hb text-secondary">{{ dev.last_heartbeat or 'Never' }}</span>
+                </div>
+            </div>
+            <div class="card-footer bg-darker border-secondary d-flex justify-content-between py-2 px-3">
+                <button class="btn btn-outline-info btn-xs btn-reconnect-dev" data-device-id="{{ dev.device_id }}">
+                    <i class="bi bi-arrow-repeat me-1"></i> Reconnect
+                </button>
+                <button class="btn btn-outline-danger btn-xs btn-delete-dev" data-device-id="{{ dev.device_id }}">
+                    <i class="bi bi-trash3 me-1"></i> Remove
+                </button>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="col-12 text-center py-5" id="no-devices-placeholder">
+        <i class="bi bi-hdd-network text-secondary display-4 d-block mb-3"></i>
+        <h5 class="text-light">No Network Testing Devices Registered</h5>
+        <p class="text-muted small">
+            Install and run the Sender or Receiver Agent on your target computers, or click below to register manually.
+        </p>
+        <button class="btn btn-outline-primary btn-sm mt-2" data-bs-toggle="modal" data-bs-target="#registerDeviceModal">
+            <i class="bi bi-plus-circle me-1"></i> Register Device
+        </button>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Registered Devices Detailed Table -->
+<div class="card bg-navy border-secondary shadow-sm mb-4">
+    <div class="card-header bg-darker border-secondary py-2 px-3 d-flex justify-content-between align-items-center">
+        <span class="fw-bold text-light fs-7">
+            <i class="bi bi-table me-2 text-warning"></i>All Registered Testing Nodes
+        </span>
+        <span class="badge bg-secondary font-monospace" id="dev-count-badge">{{ devices|length }} Nodes</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-dark table-hover table-bordered mb-0 align-middle fs-8" id="devices-table">
+            <thead class="table-secondary text-dark text-uppercase fs-9">
+                <tr>
+                    <th>Role</th>
+                    <th>Device ID</th>
+                    <th>Hostname</th>
+                    <th>IP Address</th>
+                    <th>OS & Kernel</th>
+                    <th>Status</th>
+                    <th>Link / Speed</th>
+                    <th>PHY CRC Support</th>
+                    <th>Last Heartbeat</th>
+                    <th class="text-center">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for dev in devices %}
+                <tr data-row-device-id="{{ dev.device_id }}">
+                    <td>
+                        <span class="badge {% if dev.device_type == 'sender' %}bg-primary{% else %}bg-success{% endif %} text-uppercase fs-9">
+                            {{ dev.device_type }}
+                        </span>
+                    </td>
+                    <td class="font-monospace fw-semibold text-info">{{ dev.device_id }}</td>
+                    <td class="text-light">{{ dev.hostname }}</td>
+                    <td class="font-monospace">{{ dev.ip_address }}</td>
+                    <td class="small text-muted">{{ dev.os_info }}</td>
+                    <td>
+                        <span class="badge {% if dev.status == 'online' %}bg-success{% elif dev.status == 'testing' %}bg-warning text-dark{% else %}bg-secondary{% endif %} fs-9 dev-row-status">
+                            {{ dev.status|upper }}
+                        </span>
+                    </td>
+                    <td>{{ dev.active_interface or 'eth0' }} ({{ dev.link_speed_mbps }} Mbps)</td>
+                    <td>
+                        {% if dev.crc_supported %}
+                        <span class="text-success"><i class="bi bi-check-circle-fill me-1"></i>Supported</span>
+                        {% else %}
+                        <span class="text-muted"><i class="bi bi-dash-circle me-1"></i>Not Exposed</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-muted font-monospace small dev-row-hb">{{ dev.last_heartbeat or 'Never' }}</td>
+                    <td class="text-center">
+                        <button class="btn btn-outline-info btn-xs btn-reconnect-dev me-1" data-device-id="{{ dev.device_id }}" title="Reconnect">
+                            <i class="bi bi-arrow-repeat"></i>
+                        </button>
+                        <button class="btn btn-outline-danger btn-xs btn-delete-dev" data-device-id="{{ dev.device_id }}" title="Delete">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal: Register Device -->
+<div class="modal fade" id="registerDeviceModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-navy border-secondary text-light">
+            <div class="modal-header border-secondary py-2 px-3">
+                <h5 class="modal-title fs-6 fw-bold">
+                    <i class="bi bi-plus-circle text-primary me-2"></i>Register Network Testing Device
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="form-register-device">
+                <div class="modal-body p-3 fs-8">
+                    <div class="mb-3">
+                        <label class="form-label fw-medium text-muted">Device Role</label>
+                        <select class="form-select form-select-sm bg-darker border-secondary text-light" id="reg-device-type" required>
+                            <option value="sender" selected>Sender (Device 1 – Drives Active Network Probes)</option>
+                            <option value="receiver">Receiver (Device 2 – Echo Responder & Throughput Target)</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-medium text-muted">Device ID (Unique Identifier)</label>
+                        <input type="text" class="form-control form-control-sm bg-darker border-secondary text-light font-monospace" id="reg-device-id" placeholder="e.g. sender-lab-01" required>
+                        <div class="form-text text-muted fs-9">Alphanumeric, dashes, or underscores (3-64 chars).</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-medium text-muted">Hostname / Display Name</label>
+                        <input type="text" class="form-control form-control-sm bg-darker border-secondary text-light" id="reg-hostname" placeholder="e.g. Dell-Precision-5570" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-medium text-muted">Device IP Address</label>
+                        <input type="text" class="form-control form-control-sm bg-darker border-secondary text-light font-monospace" id="reg-ip" placeholder="192.168.10.10" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-medium text-muted">Operating System</label>
+                        <select class="form-select form-select-sm bg-darker border-secondary text-light" id="reg-os">
+                            <option value="Windows 11 Pro">Windows 11 Pro / Enterprise</option>
+                            <option value="Windows 10 Pro">Windows 10 Pro / Enterprise</option>
+                            <option value="Ubuntu 24.04 LTS">Ubuntu Linux (24.04 / 22.04 LTS)</option>
+                            <option value="Kali Linux 2024.x">Kali Linux (2023 / 2024)</option>
+                            <option value="Debian / RedHat / Other">Debian / RedHat / Other Linux</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-medium text-muted d-flex justify-content-between">
+                            <span>Authentication Token</span>
+                            <button type="button" class="btn btn-link btn-xs p-0 text-info text-decoration-none" id="btn-gen-modal-token">
+                                <i class="bi bi-magic me-1"></i> Generate New Token
+                            </button>
+                        </label>
+                        <input type="text" class="form-control form-control-sm bg-darker border-secondary text-light font-monospace" id="reg-token" placeholder="Optional: auto-generated if left blank">
+                    </div>
+                </div>
+                <div class="modal-footer border-secondary py-2 px-3">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary btn-sm">
+                        <i class="bi bi-check2-circle me-1"></i> Save & Register Device
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_head %}
+<script src="{{ url_for('static', filename='js/device_management.js') }}" defer></script>
+{% endblock %}
